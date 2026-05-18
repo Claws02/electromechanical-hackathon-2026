@@ -1,0 +1,63 @@
+name: Hour 12 Twist Vote
+description: Organizer posts this at T+12h. Participants react with 👍 to cast their vote.
+title: "⚡ HOUR 12 TWIST VOTE — React to choose your constraint"
+labels: ["twist-vote"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # ⚡ Hour 12 Twist Vote
+
+        The halfway point is here! React with 👍 on the comment for your chosen constraint.
+
+        **Rules:**
+        - One vote per participant
+        - Voting closes in **30 minutes**
+        - The constraint with the most votes applies to ALL designs
+        - In case of a tie, the organizer decides
+
+        ---
+
+        ## How to Vote
+
+        Scroll down to the **Comments** section below.
+        Each constraint is posted as a separate comment.
+        React 👍 to the one you want.
+
+        ---
+
+  - type: dropdown
+    id: announced-winner
+    attributes:
+      label: "[Organizer Only] Winning Twist (fill in after voting closes)"
+      description: Update this field after tallying votes to officially announce the winner.
+      options:
+        - "P1 — Battery Only"
+        - "P2 — Solar Powered"
+        - "P3 — 5mW Budget"
+        - "C1 — No WiFi"
+        - "C2 — Offline Only"
+        - "C3 — One-Wire Output"
+        - "M1 — No Screws"
+        - "M2 — 100mm Cube Max"
+        - "M3 — Repurposed Enclosure"
+        - "$1 — $15 BOM Cap"
+        - "$2 — 3-Component Rule"
+        - "$3 — No Microcontroller"
+        - "S1 — Add Accessibility"
+        - "S2 — Child Safe"
+        - "S3 — Rental Friendly"
+        - "S4 — Fail Safe Mode"
+    validations:
+      required: false
+
+  - type: textarea
+    id: vote-tally
+    attributes:
+      label: "[Organizer Only] Vote Tally"
+      placeholder: |
+        P1: 2 votes
+        M2: 1 vote
+        S3: 2 votes
+        Winner (tiebreak): S3 — Rental Friendly

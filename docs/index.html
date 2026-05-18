@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Electromechanical Design Hackathon 2026</title>
+  <link rel="stylesheet" href="style.css">
+  <meta name="description" content="24-hour competitive electromechanical design hackathon. Five engineers. Five challenges. One winner.">
+</head>
+<body>
+
+<!-- ── Navigation ─────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="container nav-inner">
+    <div class="nav-brand">⚡ <span>EM</span> Hackathon 2026</div>
+    <ul class="nav-links">
+      <li><a href="#challenges">Challenges</a></li>
+      <li><a href="#timeline">Timeline</a></li>
+      <li><a href="#twist">Twist</a></li>
+      <li><a href="#rubric">Rubric</a></li>
+      <li><a href="#participants">Participants</a></li>
+      <li><a href="https://github.com/claws02/electromechanical-hackathon-2026" target="_blank">GitHub →</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────────────────────── -->
+<section id="hero">
+  <div class="container">
+    <div class="hero-eyebrow">
+      <span class="pulse-dot"></span>
+      24-Hour Engineering Sprint
+    </div>
+    <h1 class="hero-title">Electromechanical<br><span>Design Hackathon</span> 2026</h1>
+    <p class="hero-sub">Five engineers. Five challenges. One twist. One winner.</p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">📅 <strong>May 18, 2026</strong> · 5:00 PM — May 19 · 5:00 PM</div>
+      <div class="hero-meta-item">👥 <strong>5</strong> participants</div>
+      <div class="hero-meta-item">🏆 <strong>100</strong> points to earn</div>
+    </div>
+
+    <!-- Countdown -->
+    <div class="countdown-wrapper">
+      <div class="countdown-label" id="cd-label">Hackathon Starts In</div>
+      <div class="countdown-digits">
+        <div class="cd-unit">
+          <div class="cd-value" id="cd-h">00</div>
+          <div class="cd-label">Hours</div>
+        </div>
+        <div class="cd-sep">:</div>
+        <div class="cd-unit">
+          <div class="cd-value" id="cd-m">00</div>
+          <div class="cd-label">Minutes</div>
+        </div>
+        <div class="cd-sep">:</div>
+        <div class="cd-unit">
+          <div class="cd-value" id="cd-s">00</div>
+          <div class="cd-label">Seconds</div>
+        </div>
+      </div>
+      <div class="countdown-status" id="cd-status"></div>
+    </div>
+
+    <!-- Phase Banner (visible only during hackathon) -->
+    <div id="phase-banner" style="display:none;">
+      <div class="phase-badge">
+        <span class="phase-dot"></span>
+        <span class="phase-name" id="phase-name">Research & Ideation</span>
+        <span class="phase-time-remaining" id="phase-time"></span>
+      </div>
+    </div>
+
+    <!-- Overall Progress -->
+    <div class="overall-progress">
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-labels">
+        <span>T+0h</span>
+        <span id="progress-pct"></span>
+        <span>T+24h</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Challenge Prompts ───────────────────────────────────────────────────── -->
+<section id="challenges">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">Challenges</span>
+      <h2 class="section-title">The 5 Challenge Prompts</h2>
+    </div>
+    <p style="margin-bottom:32px;">Each participant is randomly assigned one challenge at T-0. All 5 challenges are revealed simultaneously when the hackathon begins.</p>
+    <div class="prompts-grid" id="prompts-grid">
+      <!-- Rendered by app.js -->
+    </div>
+  </div>
+</section>
+
+<!-- ── Timeline ───────────────────────────────────────────────────────────── -->
+<section id="timeline">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">Schedule</span>
+      <h2 class="section-title">Competition Timeline</h2>
+    </div>
+    <div class="timeline">
+
+      <div class="timeline-item" data-phase="0">
+        <div class="timeline-dot"></div>
+        <div class="timeline-header">
+          <span class="timeline-hour">T+0h → T+2h</span>
+          <span class="timeline-name">Research & Ideation</span>
+        </div>
+        <div class="timeline-desc">Challenges revealed. Define the problem, research existing solutions, sketch concepts. Write your Problem Statement.</div>
+      </div>
+
+      <div class="timeline-item" data-phase="1">
+        <div class="timeline-dot"></div>
+        <div class="timeline-header">
+          <span class="timeline-hour">T+2h → T+10h</span>
+          <span class="timeline-name">Engineering Design</span>
+        </div>
+        <div class="timeline-desc">Electrical schematic, component selection, power budget, CAD / enclosure concept. Produce deliverables 2, 3, and 4.</div>
+      </div>
+
+      <div class="timeline-item twist" data-twist>
+        <div class="timeline-dot"></div>
+        <div class="timeline-header">
+          <span class="timeline-hour">T+12h</span>
+          <span class="timeline-name">⚡ THE TWIST</span>
+          <span class="badge-twist">Live Vote</span>
+        </div>
+        <div class="timeline-desc">Participants vote on one constraint to apply to ALL designs for the remaining 12 hours. Voting window: 30 minutes. React to the pinned GitHub issue to cast your vote.</div>
+      </div>
+
+      <div class="timeline-item" data-phase="2">
+        <div class="timeline-dot"></div>
+        <div class="timeline-header">
+          <span class="timeline-hour">T+10h → T+18h</span>
+          <span class="timeline-name">Prototype & Simulation</span>
+        </div>
+        <div class="timeline-desc">Wokwi / LTspice / Falstad simulation, validate your architecture, produce deliverable 6. Incorporate the winning twist constraint.</div>
+      </div>
+
+      <div class="timeline-item" data-phase="3">
+        <div class="timeline-dot"></div>
+        <div class="timeline-header">
+          <span class="timeline-hour">T+18h → T+24h</span>
+          <span class="timeline-name">Packaging & Pitch</span>
+        </div>
+        <div class="timeline-desc">Polish documentation, create pitch deck (deliverable 7), push all deliverables. Final commit must be before T+24h.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Twist ───────────────────────────────────────────────────────────────── -->
+<section id="twist">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">Hour 12</span>
+      <h2 class="section-title">The Twist</h2>
+    </div>
+
+    <!-- Twist status banner — updated by JS -->
+    <div class="twist-status-banner" id="twist-banner" style="display:none;">
+      <div class="twist-status-icon" id="twist-status-icon">⏳</div>
+      <div class="twist-status-text">
+        <div id="twist-status-title"><strong>Twist Vote Opens at T+12h</strong></div>
+        <p id="twist-status-desc">16 constraints are on the table. You'll vote by reacting to the pinned GitHub issue.</p>
+      </div>
+    </div>
+
+    <p style="margin-bottom:28px;">At Hour 12, participants vote on one constraint that applies to <strong>all</strong> designs for the final 12 hours. The winning twist is applied immediately and must be reflected in all deliverables.</p>
+    <p style="margin-bottom:32px;">Vote by reacting 👍 on the constraint comment in the <a href="https://github.com/claws02/electromechanical-hackathon-2026/issues" target="_blank">pinned GitHub issue →</a></p>
+
+    <div class="twist-categories" id="twist-categories">
+      <!-- Rendered by app.js -->
+    </div>
+  </div>
+</section>
+
+<!-- ── Deliverables ────────────────────────────────────────────────────────── -->
+<section id="deliverables">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">Requirements</span>
+      <h2 class="section-title">7 Required Deliverables</h2>
+    </div>
+    <div class="deliverables-list">
+      <div class="deliverable-item">
+        <div class="deliverable-num">01</div>
+        <div>
+          <div class="deliverable-name">Problem Statement</div>
+          <div class="deliverable-desc">Problem definition, user stories, existing solutions analysis, and gap analysis.</div>
+          <div class="deliverable-filename">01-problem-statement.md</div>
+        </div>
+      </div>
+      <div class="deliverable-item">
+        <div class="deliverable-num">02</div>
+        <div>
+          <div class="deliverable-name">System Architecture Diagram</div>
+          <div class="deliverable-desc">Block diagram, signal flow, subsystem breakdown. Can be image or markdown.</div>
+          <div class="deliverable-filename">02-system-architecture.md / .png</div>
+        </div>
+      </div>
+      <div class="deliverable-item">
+        <div class="deliverable-num">03</div>
+        <div>
+          <div class="deliverable-name">Electrical Design</div>
+          <div class="deliverable-desc">Schematic, component selection with justification, and power budget.</div>
+          <div class="deliverable-filename">03-electrical-design.md</div>
+        </div>
+      </div>
+      <div class="deliverable-item">
+        <div class="deliverable-num">04</div>
+        <div>
+          <div class="deliverable-name">Mechanical Design</div>
+          <div class="deliverable-desc">CAD files or screenshots, exploded view, enclosure concept and assembly strategy.</div>
+          <div class="deliverable-filename">04-mechanical-design.md</div>
+        </div>
+      </div>
+      <div class="deliverable-item">
+        <div class="deliverable-num">05</div>
+        <div>
+          <div class="deliverable-name">Firmware Logic</div>
+          <div class="deliverable-desc">Pseudocode, real code, state machine, or flowchart. Wokwi simulation link welcome.</div>
+          <div class="deliverable-filename">05-firmware-logic.md / .ino / .py</div>
+        </div>
+      </div>
+      <div class="deliverable-item">
+        <div class="deliverable-num">06</div>
+        <div>
+          <div class="deliverable-name">Simulation / Validation</div>
+          <div class="deliverable-desc">Wokwi, LTspice, or Falstad screenshots with test results and observations.</div>
+          <div class="deliverable-filename">06-simulation-validation.md</div>
+        </div>
+      </div>
+      <div class="deliverable-item">
+        <div class="deliverable-num">07</div>
+        <div>
+          <div class="deliverable-name">Pitch Deck</div>
+          <div class="deliverable-desc">3-minute pitch slides. Google Slides link, PDF upload, or markdown slide outline.</div>
+          <div class="deliverable-filename">07-pitch-deck.md / .pdf</div>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top:24px;font-size:.875rem;">
+      Files go in: <code>participants/your-name/deliverables/</code> &nbsp;·&nbsp;
+      <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/CONTRIBUTING.md" target="_blank">Submission instructions →</a>
+    </p>
+  </div>
+</section>
+
+<!-- ── Rubric ──────────────────────────────────────────────────────────────── -->
+<section id="rubric">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">Judging</span>
+      <h2 class="section-title">Scoring Rubric</h2>
+    </div>
+    <p style="margin-bottom:24px;">Each category is scored by each judge independently. Scores are averaged across judges. See the full rubric with detailed criteria in <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/admin/scoring-sheet.md" target="_blank">admin/scoring-sheet.md →</a></p>
+    <div class="rubric-wrapper">
+      <table class="rubric-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Points</th>
+          </tr>
+        </thead>
+        <tbody id="rubric-tbody">
+          <!-- Rendered by app.js -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── Participants ────────────────────────────────────────────────────────── -->
+<section id="participants">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">Submissions</span>
+      <h2 class="section-title">Participant Submission Board</h2>
+    </div>
+    <p style="margin-bottom:32px;">
+      Live submission status. Updated as participants push their deliverables.
+      Organizer: edit the <code>PARTICIPANTS</code> array in <code>docs/app.js</code> to update names, prompt assignments, and status.
+    </p>
+    <div class="participants-grid" id="participants-grid">
+      <!-- Rendered by app.js -->
+    </div>
+  </div>
+</section>
+
+<!-- ── Tools ──────────────────────────────────────────────────────────────── -->
+<section id="tools">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-tag">Stack</span>
+      <h2 class="section-title">Allowed Tool Stack</h2>
+    </div>
+    <div class="tools-grid">
+      <div class="tool-category">
+        <div class="tool-category-name">CAD / Mechanical</div>
+        <div class="tool-tags">
+          <span class="tool-tag">Fusion 360</span>
+          <span class="tool-tag">FreeCAD</span>
+          <span class="tool-tag">Onshape</span>
+        </div>
+      </div>
+      <div class="tool-category">
+        <div class="tool-category-name">Electronics / PCB</div>
+        <div class="tool-tags">
+          <span class="tool-tag">KiCad</span>
+          <span class="tool-tag">EasyEDA</span>
+          <span class="tool-tag">LTspice</span>
+          <span class="tool-tag">Falstad</span>
+          <span class="tool-tag">TinkerCAD</span>
+        </div>
+      </div>
+      <div class="tool-category">
+        <div class="tool-category-name">Firmware / Embedded</div>
+        <div class="tool-tags">
+          <span class="tool-tag">Arduino IDE</span>
+          <span class="tool-tag">MicroPython</span>
+          <span class="tool-tag">Wokwi</span>
+          <span class="tool-tag">PlatformIO</span>
+        </div>
+      </div>
+      <div class="tool-category">
+        <div class="tool-category-name">Docs / Visualization</div>
+        <div class="tool-tags">
+          <span class="tool-tag">Blender</span>
+          <span class="tool-tag">Inkscape</span>
+          <span class="tool-tag">Figma</span>
+          <span class="tool-tag">Google Slides</span>
+          <span class="tool-tag">Notion</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/claws02/electromechanical-hackathon-2026" target="_blank">GitHub Repository</a>
+      <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/README.md" target="_blank">Rules & Info</a>
+      <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/CONTRIBUTING.md" target="_blank">How to Submit</a>
+      <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/admin/twist-voting.md" target="_blank">Twist Voting</a>
+      <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/admin/scoring-sheet.md" target="_blank">Scoring Sheet</a>
+    </div>
+    <div class="footer-copy">Electromechanical Design Hackathon 2026 · May 18–19, 2026</div>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
