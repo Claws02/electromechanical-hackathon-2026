@@ -1,0 +1,41 @@
+name: Submission Tracker
+description: Organizer creates one of these to enable automated submission status comments.
+title: "[TRACKER] Hackathon Submission Status"
+labels: ["submission-tracker"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Submission Tracker Issue
+
+        Create this issue **before the hackathon starts**. The automated submission validator
+        will post a comment here every time a participant pushes to their folder.
+
+        Do **not** close this issue until after judging is complete.
+
+  - type: input
+    id: event-date
+    attributes:
+      label: Event Date
+      placeholder: "May 18–19, 2026"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: participants
+    attributes:
+      label: Registered Participants
+      description: Check off participants as they register.
+      options:
+        - label: Participant 1
+        - label: Participant 2
+        - label: Participant 3
+        - label: Participant 4
+        - label: Participant 5
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Organizer Notes
+      placeholder: "Any setup notes, participant contact info, special instructions..."
