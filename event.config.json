@@ -1,0 +1,68 @@
+{
+  "$comment": [
+    "SINGLE SOURCE OF TRUTH for roster and schedule. GitHub Actions workflows read this file.",
+    "",
+    "IF YOU CHANGE THE DATE OR ROSTER, change it in TWO places:",
+    "  1. this file",
+    "  2. docs/app.js  (the CONFIG block at the top)",
+    "",
+    "The `config-consistency` job in .github/workflows/validate-submissions.yml fails the",
+    "build if the two disagree, so you cannot silently drift. Do not delete that job.",
+    "",
+    "TIMEZONE: every timestamp below carries an explicit UTC offset on purpose. A bare",
+    "'2026-08-21T17:00:00' is parsed in the VIEWER's local timezone by JavaScript, which means",
+    "participants in different timezones would see different deadlines from the same page.",
+    "Offsets below are US Central Daylight Time (UTC-05:00), in effect on these dates.",
+    "If your group is not in Central time, change the offsets here and in docs/app.js."
+  ],
+
+  "event": {
+    "name": "Electromechanical Design Hackathon 2026",
+    "edition": "2026 Inaugural",
+    "timezone": "America/Chicago",
+    "timezoneLabel": "CDT",
+    "utcOffset": "-05:00",
+    "start": "2026-08-21T17:00:00-05:00",
+    "end": "2026-08-22T17:00:00-05:00",
+    "durationHours": 24,
+    "twistHour": 12,
+    "twistVoteWindowMinutes": 30,
+    "scoringDeadline": "2026-08-25T17:00:00-05:00"
+  },
+
+  "competitors": [
+    {
+      "name": "Caleb",
+      "slug": "caleb",
+      "github": "Claws02",
+      "role": "organizer+competitor"
+    },
+    {
+      "name": "Friend One",
+      "slug": "friend-one",
+      "github": "REPLACE-WITH-GITHUB-USERNAME",
+      "role": "competitor"
+    },
+    {
+      "name": "Friend Two",
+      "slug": "friend-two",
+      "github": "REPLACE-WITH-GITHUB-USERNAME",
+      "role": "competitor"
+    }
+  ],
+
+  "judging": {
+    "model": "peer",
+    "selfScoringAllowed": false,
+    "normalization": "additive-mean-centering",
+    "missingDeliverablePenalty": 3,
+    "criteria": [
+      { "key": "does_it_work",  "label": "Does It Work",     "max": 25 },
+      { "key": "creativity",    "label": "Creativity",       "max": 20 },
+      { "key": "sellable",      "label": "Sellable Product", "max": 20 },
+      { "key": "problem_fit",   "label": "Problem Fit",      "max": 15 },
+      { "key": "who_its_for",   "label": "Who It's For",     "max": 10 },
+      { "key": "the_why",       "label": "The Why",          "max": 10 }
+    ]
+  }
+}

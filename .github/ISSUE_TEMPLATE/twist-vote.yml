@@ -1,37 +1,52 @@
-name: Hour 12 Twist Vote
-description: Organizer posts this at T+12h. Participants react with 👍 to cast their vote.
-title: "⚡ HOUR 12 TWIST VOTE — React to choose your constraint"
+name: Hour 12 Twist Vote (manual fallback)
+description: >-
+  FALLBACK ONLY. The twist-vote workflow normally posts this automatically at T+12h.
+  Use this template only if Actions is unavailable.
+title: "⚡ HOUR 12 TWIST VOTE — React 👍 to choose your constraint"
 labels: ["twist-vote"]
 assignees: []
 body:
   - type: markdown
     attributes:
       value: |
+        > ### ⚠️ You probably do not need this template
+        >
+        > The [`twist-vote`](../../blob/main/.github/workflows/twist-vote.yml) workflow posts the
+        > vote issue automatically at T+12h, with all 16 constraints as separate comments ready
+        > to react to. Run it from the **Actions** tab (`workflow_dispatch`) rather than filling
+        > this in by hand.
+        >
+        > Use this template **only** if Actions is down or the workflow failed. If you do, you
+        > must also post the 16 constraint comments yourself — copy them from
+        > [`admin/twists.json`](../../blob/main/admin/twists.json), formatted as
+        > `` ## `ID` — Name `` so the tally workflow can still match them.
+        >
+        > The label `twist-vote` is required either way — both tally paths look for it.
+
+  - type: markdown
+    attributes:
+      value: |
         # ⚡ Hour 12 Twist Vote
 
-        The halfway point is here! React with 👍 on the comment for your chosen constraint.
+        **Rules**
+        - One vote each. React 👍 to exactly **one** constraint comment below.
+        - Reacting to more than one **voids your whole ballot**, and the tally names you.
+        - Voting closes 30 minutes after this issue is posted.
+        - The winner applies to **every** design for the final 12 hours.
+        - A submission that does not visibly address it is capped at 15/25 on "Does It Work".
 
-        **Rules:**
-        - One vote per participant
-        - Voting closes in **30 minutes**
-        - The constraint with the most votes applies to ALL designs
-        - In case of a tie, the organizer decides
-
-        ---
-
-        ## How to Vote
-
-        Scroll down to the **Comments** section below.
-        Each constraint is posted as a separate comment.
-        React 👍 to the one you want.
-
-        ---
+  - type: input
+    id: closes-at
+    attributes:
+      label: Voting closes at
+      placeholder: "2026-08-22 05:30 CDT"
+    validations:
+      required: true
 
   - type: dropdown
     id: announced-winner
     attributes:
-      label: "[Organizer Only] Winning Twist (fill in after voting closes)"
-      description: Update this field after tallying votes to officially announce the winner.
+      label: "[Organizer] Winning twist — fill in after voting closes"
       options:
         - "P1 — Battery Only"
         - "P2 — Solar Powered"
@@ -55,9 +70,17 @@ body:
   - type: textarea
     id: vote-tally
     attributes:
-      label: "[Organizer Only] Vote Tally"
+      label: "[Organizer] Vote tally"
+      description: Record the count, any voided ballots, and the tiebreak if there was one.
       placeholder: |
-        P1: 2 votes
-        M2: 1 vote
-        S3: 2 votes
-        Winner (tiebreak): S3 — Rental Friendly
+        M2: 2 votes
+        S3: 1 vote
+        Voided: none
+        Winner: M2 — 100mm Cube Max
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        **After announcing:** set `WINNING_TWIST` in `docs/app.js` to the winning ID and push,
+        so the dashboard reflects it.

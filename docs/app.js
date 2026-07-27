@@ -1,26 +1,88 @@
-// ── Anime.js v4 ─────────────────────────────────────────────────────────────
-import { animate, stagger, createTimeline } from 'https://esm.sh/animejs@4.4.1';
+// ── Anime.js v4 — progressive enhancement, NOT a dependency ─────────────────
+//
+// This was originally a static `import ... from 'https://esm.sh/animejs@4.4.1'`.
+// A static import that fails takes the WHOLE module with it, so an esm.sh outage,
+// a blocked network, or an unpublished version left the page with a frozen
+// 00:00:00 countdown and every JS-rendered section empty — no dates, no twist
+// list, no rubric, no board. Verified by loading the page with the CDN
+// unreachable.
+//
+// The countdown is the centerpiece of a 24-hour event. It does not get to depend
+// on a third party being up. So the import is now dynamic and optional: if it
+// fails we install no-op shims with the same signatures, and every render path
+// below runs identically without animation.
+
+// The shims are the INITIAL values, not just the failure path. tick() runs before
+// the dynamic import resolves, and it calls animate() on each changed digit — so
+// these must already be callable at that point or the countdown throws on its
+// first frame.
+let animate        = () => {};
+let stagger        = () => 0;
+let createTimeline = () => { const chain = { add: () => chain }; return chain; };
+let ANIM = false;
+
+async function loadAnimations() {
+  try {
+    const m = await import('https://esm.sh/animejs@4.4.1');
+    if (!m?.animate) throw new Error('animejs loaded but has no `animate` export');
+    ({ animate, stagger, createTimeline } = m);
+    ANIM = true;
+  } catch (err) {
+    console.warn('[hackathon] Animations unavailable, rendering statically:', err.message);
+    ANIM = false;
+  }
+  return ANIM;
+}
 
 // ── Config ──────────────────────────────────────────────────────────────────
-// Edit these values to configure the event.
+//
+// ⚠️  MIRROR ANY CHANGE HERE INTO event.config.json AT THE REPO ROOT.
+//     The `config-consistency` job in .github/workflows/validate-submissions.yml
+//     fails the build if the two drift apart. That check is deliberate — don't
+//     remove it. Config lives inline here (rather than being fetched) so the
+//     countdown cannot break on a failed network request.
+//
+// ⚠️  THE UTC OFFSET IS LOAD-BEARING. `new Date('2026-08-21T17:00:00')` with no
+//     offset is parsed in the VIEWER's local timezone, so a participant two zones
+//     over would see a different deadline from the same page. The '-05:00' below
+//     is US Central Daylight Time, in effect on these dates. If your group isn't
+//     in Central time, change it here and in event.config.json.
 
-const HACKATHON_START = new Date('2026-05-18T17:00:00');
+const HACKATHON_START = new Date('2026-08-21T17:00:00-05:00');
 const HACKATHON_END   = new Date(HACKATHON_START.getTime() + 24 * 60 * 60 * 1000);
+const TZ_LABEL        = 'CDT';
 const TWIST_HOUR      = 12;   // hours after start
 const TWIST_VOTE_MIN  = 30;   // voting window in minutes
 
-// Update participant entries: set name, slug (folder name), prompt (1–5 or null), status.
-// status: 'pending' | 'partial' | 'submitted'
+const REPO = 'https://github.com/claws02/electromechanical-hackathon-2026';
+
+// Competitors. `prompt` is the assigned challenge number, set at T-0 (see
+// challenges/README.md for the assignment protocol). `status`: 'pending' | 'partial' | 'submitted'
 const PARTICIPANTS = [
-  { name: 'Participant 1', slug: 'participant-1', prompt: null, status: 'pending' },
-  { name: 'Participant 2', slug: 'participant-2', prompt: null, status: 'pending' },
-  { name: 'Participant 3', slug: 'participant-3', prompt: null, status: 'pending' },
-  { name: 'Participant 4', slug: 'participant-4', prompt: null, status: 'pending' },
-  { name: 'Participant 5', slug: 'participant-5', prompt: null, status: 'pending' },
+  { name: 'Caleb',      slug: 'caleb',       prompt: null, status: 'pending' },
+  { name: 'Friend One', slug: 'friend-one',  prompt: null, status: 'pending' },
+  { name: 'Friend Two', slug: 'friend-two',  prompt: null, status: 'pending' },
 ];
 
 // Set to the winning twist ID (e.g. 'M2') once announced, or keep null.
+// The twist-tally workflow tells you which to put here.
 const WINNING_TWIST = null;
+
+// Final scores, filled in after the tally-scores workflow posts results.
+// Leave empty until then — the results section stays hidden while it is.
+// Shape: one object per competitor with keys  slug / final / rank
+//   [ { slug: "caleb", final: 79.3, rank: 1 }, ... ]   ← double quotes on purpose;
+// the config-consistency check greps single-quoted slugs to compare the roster
+// against event.config.json, and a commented example would otherwise be counted.
+const RESULTS = [];
+
+const CHALLENGES = [
+  { num: 1, title: 'The Forgotten Stove Problem', file: '01-forgotten-stove',           difficulty: 3, hook: 'Prevent kitchen fires from unattended cooking, without touching the stove.' },
+  { num: 2, title: 'Laundry Guardian',            file: '02-laundry-guardian',          difficulty: 2, hook: 'Detect cycle completion on an unmodified washer or dryer.' },
+  { num: 3, title: 'Nighttime Bathroom Safety',   file: '03-nighttime-bathroom-safety', difficulty: 4, hook: 'Light the way for a drowsy user without wrecking their sleep.' },
+  { num: 4, title: 'Phantom Power Killer',        file: '04-phantom-power-killer',      difficulty: 5, hook: 'Cut vampire draw to idle devices — never to one in use.' },
+  { num: 5, title: 'Pet Home Alone Companion',    file: '05-pet-home-alone',            difficulty: 3, hook: 'Sense a pet’s state and actually intervene, not just watch.' },
+];
 
 const PHASES = [
   { label: 'Research & Ideation',    emoji: '🔍', start:  0, end:  2, color: 'var(--blue)'  },
@@ -48,13 +110,15 @@ const TWISTS = [
   { id: 'S4', cat: 'Scope',        name: 'Fail Safe Mode',       desc: 'On power loss or failure, device must auto-transition to a safe state.' },
 ];
 
+// Six criteria. Weighted toward demonstrated function, and toward commercial
+// viability because it is the hardest thing to fake in 24 hours.
 const RUBRIC = [
-  { cat: 'Problem Relevance',              pts: 15 },
-  { cat: 'Creativity',                     pts: 20 },
-  { cat: 'Electrical Engineering Quality', pts: 15 },
-  { cat: 'Mechanical Design Quality',      pts: 15 },
-  { cat: 'Feasibility & Manufacturability',pts: 20 },
-  { cat: 'Documentation & Presentation',   pts: 15 },
+  { cat: 'Does It Work',     pts: 25, q: 'Is this technically valid and validated, or asserted?' },
+  { cat: 'Creativity',       pts: 20, q: 'Is this original, or the first thing anyone would think of?' },
+  { cat: 'Sellable Product', pts: 20, q: 'Could this be sold at a price someone would pay?' },
+  { cat: 'Problem Fit',      pts: 15, q: 'Does it solve the stated problem, or an easier adjacent one?' },
+  { cat: "Who It's For",     pts: 10, q: 'Is there a specific user, and did the design change because of them?' },
+  { cat: 'The Why',          pts: 10, q: 'Does this need to exist? Is the justification honest?' },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -66,6 +130,30 @@ const msToHMS = ms => {
 const currentPhase = hElapsed =>
   PHASES.find(p => hElapsed >= p.start && hElapsed < p.end) ?? null;
 const el = id => document.getElementById(id);
+
+// ── Render: Hero date ─────────────────────────────────────────────────────────
+// Rendered from the canonical Date objects rather than hardcoded in the HTML, so
+// the displayed dates can never disagree with the countdown driving them.
+function renderHeroDate() {
+  const node = el('js-date');
+  if (!node) return;
+
+  const fmt = d => d.toLocaleString(undefined, {
+    weekday: 'short', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+
+  // The event clock is authoritative in one timezone; show the viewer's local
+  // rendering plus the canonical zone so nobody has to guess which applies.
+  const canonical = d => d.toLocaleString('en-US', {
+    timeZone: 'America/Chicago',
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+
+  node.innerHTML = `
+    <span>${fmt(HACKATHON_START)}</span> → <span>${fmt(HACKATHON_END)}</span>
+    <span class="date-tz">${canonical(HACKATHON_START)} – ${canonical(HACKATHON_END)} ${TZ_LABEL}</span>`;
+}
 
 // ── Render: Twist Grid ────────────────────────────────────────────────────────
 function renderTwists() {
@@ -98,7 +186,10 @@ function renderRubric() {
   const max = Math.max(...RUBRIC.map(r => r.pts));
   list.innerHTML = RUBRIC.map(r => `
     <div class="rubric-row">
-      <div class="rubric-cat">${r.cat}</div>
+      <div class="rubric-cat">
+        <span class="rubric-cat-name">${r.cat}</span>
+        <span class="rubric-cat-q">${r.q}</span>
+      </div>
       <div class="rubric-bar-track">
         <div class="rubric-bar-fill" data-pts="${r.pts}" data-max="${max}" style="width:0"></div>
       </div>
@@ -106,14 +197,68 @@ function renderRubric() {
     </div>`).join('');
 }
 
+// ── Render: Challenge Grid ────────────────────────────────────────────────────
+function renderChallenges() {
+  const grid = el('challenge-grid');
+  if (!grid) return;
+  grid.innerHTML = CHALLENGES.map(c => `
+    <a class="ch-card" href="${REPO}/blob/main/challenges/${c.file}.md" target="_blank" rel="noopener">
+      <div class="ch-card-top">
+        <span class="ch-num">#${c.num}</span>
+        <span class="ch-diff" title="Difficulty ${c.difficulty} of 5">${'●'.repeat(c.difficulty)}${'○'.repeat(5 - c.difficulty)}</span>
+      </div>
+      <div class="ch-title">${c.title}</div>
+      <div class="ch-hook">${c.hook}</div>
+      <span class="ch-link">Read the full brief →</span>
+    </a>`).join('');
+}
+
+// ── Render: Results ───────────────────────────────────────────────────────────
+// Hidden until RESULTS is populated after the tally-scores workflow runs.
+function renderResults() {
+  const section = el('results');
+  if (!section) return;
+
+  if (!RESULTS.length) {
+    section.classList.remove('visible');
+    return;
+  }
+  section.classList.add('visible');
+
+  const medal = i => ['🥇', '🥈', '🥉'][i] ?? `${i + 1}`;
+  const byRank = [...RESULTS].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99) || b.final - a.final);
+  const top = byRank[0]?.final || 100;
+
+  const board = el('results-board');
+  if (board) {
+    board.innerHTML = byRank.map((r, i) => {
+      const p = PARTICIPANTS.find(x => x.slug === r.slug);
+      const name = p?.name ?? r.slug;
+      const ch = p?.prompt ? `Challenge #${p.prompt}` : '';
+      return `
+        <div class="res-row${i === 0 ? ' res-winner' : ''}">
+          <div class="res-rank">${medal(i)}</div>
+          <div class="res-who">
+            <div class="res-name">${name}</div>
+            <div class="res-ch">${ch}</div>
+          </div>
+          <div class="res-bar-track">
+            <div class="res-bar-fill" style="width:${Math.max(4, (r.final / top) * 100)}%"></div>
+          </div>
+          <div class="res-score">${r.final.toFixed(1)}</div>
+        </div>`;
+    }).join('');
+  }
+}
+
 // ── Render: Participants ──────────────────────────────────────────────────────
 function renderParticipants(started) {
   const grid = el('participants-grid');
   if (!grid) return;
-  const base = 'https://github.com/claws02/electromechanical-hackathon-2026/tree/main/participants/';
+  const base = `${REPO}/tree/main/participants/`;
   grid.innerHTML = PARTICIPANTS.map(p => {
     const initials = p.name.split(' ').map(w => w[0]).join('').slice(0, 2);
-    const promptText = started && p.prompt ? `Challenge #${p.prompt}` : started ? 'Assigned at T-0' : 'TBD';
+    const promptText = started && p.prompt ? `Challenge #${p.prompt}` : started ? 'Assigned at T-0' : 'Drawn at T-0';
     const statusMap = {
       pending:   ['Pending',     'status-pending'],
       partial:   ['In Progress', 'status-partial'],
@@ -169,8 +314,20 @@ function tick() {
 
   // ── Countdown digits
   let h, m, s, label, statusText;
+  let units = ['Hours', 'Min', 'Sec'];
+
   if (!started) {
-    ({ h, m, s } = msToHMS(msToStart));
+    // Beyond 48 hours out, an hours-only readout is both unhelpful and wide enough
+    // to crowd the separators (e.g. "605"). Switch to days for the long wait.
+    if (msToStart > 48 * 3600 * 1000) {
+      const totalMin = Math.floor(msToStart / 60000);
+      h = Math.floor(totalMin / 1440);            // days
+      m = Math.floor((totalMin % 1440) / 60);     // hours
+      s = totalMin % 60;                          // minutes
+      units = ['Days', 'Hours', 'Min'];
+    } else {
+      ({ h, m, s } = msToHMS(msToStart));
+    }
     label = 'Hackathon Starts In';
     statusText = `${HACKATHON_START.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' })} · ${HACKATHON_START.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' })}`;
   } else if (!ended) {
@@ -190,6 +347,11 @@ function tick() {
   updateDigit('cd-h', hStr);
   updateDigit('cd-m', mStr);
   updateDigit('cd-s', sStr);
+
+  ['cd-u1', 'cd-u2', 'cd-u3'].forEach((id, i) => {
+    const node = el(id);
+    if (node && node.textContent !== units[i]) node.textContent = units[i];
+  });
 
   // ── Progress bar
   const pct = started && !ended
@@ -357,20 +519,55 @@ function initSectionHeaders() {
   headers.forEach(h => observer.observe(h));
 }
 
+// ── Static finalize ───────────────────────────────────────────────────────────
+// The no-animation path. The rubric bars are emitted at width:0 for the tween to
+// fill, so without a tween they have to be set to their final widths here or they
+// render as empty tracks.
+function finalizeStatic() {
+  document.querySelectorAll('.rubric-bar-fill').forEach(bar => {
+    const pts = parseInt(bar.dataset.pts, 10);
+    const max = parseInt(bar.dataset.max, 10);
+    if (Number.isFinite(pts) && Number.isFinite(max) && max > 0) {
+      bar.style.width = `${(pts / max) * 100}%`;
+    }
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  // Render dynamic content
+document.addEventListener('DOMContentLoaded', async () => {
+  // ── Phase 1: content and clock. No external dependency, runs first, always.
   renderTwists();
   renderRubric();
+  renderChallenges();
+  renderResults();
   renderParticipants(new Date() >= HACKATHON_START);
+  renderHeroDate();
 
-  // Hide hero elements before animating them in (set here so no-JS users still see them)
-  ['#js-eyebrow','#js-title','#js-sub','#js-date','#js-countdown','#js-bar'].forEach(sel => {
+  tick();
+  setInterval(tick, 1000);
+
+  // ── Phase 2: animation, if it is available.
+  // Nothing above is hidden until we know the tween library actually loaded —
+  // otherwise a CDN failure would leave elements stuck at opacity 0.
+  const ok = await loadAnimations();
+
+  if (!ok) {
+    finalizeStatic();
+    return;
+  }
+
+  // Respect the OS reduced-motion preference: render the finished state directly.
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    finalizeStatic();
+    return;
+  }
+
+  // Safe to hide now — the tweens that reveal these are guaranteed to exist.
+  ['#js-eyebrow', '#js-title', '#js-sub', '#js-date', '#js-countdown', '#js-bar'].forEach(sel => {
     const node = document.querySelector(sel);
     if (node) node.style.opacity = '0';
   });
 
-  // Init scroll-triggered animations
   initSectionHeaders();
   initExampleCard();
   initScrollReveal();
@@ -386,8 +583,4 @@ document.addEventListener('DOMContentLoaded', () => {
       .add('#js-countdown', { opacity: [0, 1], translateY: [24, 0], scale: [0.97, 1], duration: 650 }, 520)
       .add('#js-bar',       { opacity: [0, 1], duration: 400 }, 820);
   });
-
-  // Tick immediately, then every second
-  tick();
-  setInterval(tick, 1000);
 });

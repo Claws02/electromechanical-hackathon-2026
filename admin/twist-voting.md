@@ -1,24 +1,36 @@
 # Hour 12 Twist — Voting Instructions
 
-**Voting opens at:** T+12h · May 19, 2026 · 5:00 AM  
-**Voting closes at:** T+12h+30min · May 19, 2026 · 5:30 AM  
-**Twist applied for:** The final 12 hours of the hackathon
+**Voting opens:** T+12h · Saturday, August 22, 2026 · 5:00 AM CDT
+**Voting closes:** T+12h30m · Saturday, August 22, 2026 · 5:30 AM CDT
+**Applies for:** The final 12 hours
+
+> Yes, 5:00 AM. That is the point — the twist lands when you are 12 hours deep and least
+> prepared to re-architect. Set an alarm.
 
 ---
 
 ## How to Vote
 
-1. Go to the [Twist Vote Issue](https://github.com/claws02/electromechanical-hackathon-2026/issues) (organizer will pin it at Hour 12).
-2. React with 👍 on the comment matching your chosen twist constraint.
-3. **Each participant gets one vote.** Most votes wins.
-4. In case of a tie, the organizer flips a coin (documented in the issue).
-5. The winning twist is announced by **T+12h+30min** and applies immediately.
+The vote issue is **posted automatically** by the
+[`twist-vote`](../.github/workflows/twist-vote.yml) workflow — the organizer does not hand-write
+16 comments at five in the morning.
+
+1. At T+12h an issue titled **⚡ HOUR 12 TWIST VOTE** appears, with each of the 16 constraints
+   as its own comment.
+2. React 👍 on the **one** constraint you want.
+3. **One vote each.** Reacting to more than one **voids your entire ballot** — the tally
+   workflow detects this and names you in the results. Pick one.
+4. Most 👍 wins. A tie is broken by the organizer flipping a coin on camera, recorded in the thread.
+5. The [`twist-tally`](../.github/workflows/twist-tally.yml) workflow counts and announces at T+12h30m.
+
+If nobody votes, the organizer picks. Do not let that happen.
 
 ---
 
 ## Twist Options
 
-Vote by reacting 👍 on the corresponding comment in the vote issue.
+The definitive machine-readable list is [`twists.json`](twists.json) — that is what the vote
+workflow posts from. The text below mirrors it.
 
 ---
 
@@ -99,12 +111,19 @@ Once the winning twist is announced:
 3. Flag any significant architectural changes in your `README.md`.
 4. Continue building — you have 12 hours remaining.
 
-There is no penalty for pivoting hard. Judges appreciate honest documentation of design changes made in response to the twist.
+5. **Organizer:** set `WINNING_TWIST` in `docs/app.js` to the winning ID and push, so the
+   dashboard shows it.
+
+There is no penalty for pivoting hard — the opposite. Judges reward honest documentation of
+what the constraint forced you to change, including things you had to abandon.
+
+**But a submission that does not visibly address the twist is capped at 15/25 on
+"Does It Work."** Ignoring it means the final 12 hours were not spent on the assignment.
 
 ---
 
-## Past Twists (for future reference)
+## Past Twists
 
 | Event | Winning Twist | Votes |
 |-------|---------------|-------|
-| 2026 Inaugural | TBD | — |
+| 2026 Inaugural | _pending_ | — |

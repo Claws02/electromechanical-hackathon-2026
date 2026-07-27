@@ -1,0 +1,135 @@
+name: Open Hour-12 Twist Vote
+
+# Posts the twist vote issue and one comment per constraint, so participants only
+# have to react with 👍. Previously the organizer did this by hand at 5:00 AM.
+#
+# Scheduled for T+12h = 2026-08-22 05:00 CDT = 10:00 UTC.
+# NOTE: GitHub only runs `schedule` triggers from the DEFAULT branch, and scheduled
+# runs can be delayed by several minutes under load. Do not rely on the cron alone —
+# the runbook has you fire this manually via workflow_dispatch. The cron is a backstop.
+
+on:
+  workflow_dispatch:
+    inputs:
+      vote_minutes:
+        description: 'Voting window in minutes'
+        required: false
+        default: '30'
+  schedule:
+    - cron: '0 10 22 8 *'
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  open-vote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Post vote issue and constraint comments
+        uses: actions/github-script@v7
+        env:
+          VOTE_MINUTES: ${{ github.event.inputs.vote_minutes || '30' }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            const { twists } = JSON.parse(fs.readFileSync('admin/twists.json', 'utf8'));
+            const cfg = JSON.parse(fs.readFileSync('event.config.json', 'utf8'));
+            const voteMinutes = parseInt(process.env.VOTE_MINUTES, 10) || 30;
+
+            const competitorCount = cfg.competitors.length;
+            const closesAt = new Date(Date.now() + voteMinutes * 60_000);
+            const closesLabel = closesAt.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+
+            // Guard against opening a second vote if one is already live.
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'twist-vote',
+              state: 'open',
+              per_page: 1,
+            });
+            if (existing.data.length > 0) {
+              core.notice(`Twist vote already open: #${existing.data[0].number}. Nothing to do.`);
+              return;
+            }
+
+            const body = [
+              '# ⚡ HOUR 12 — TWIST VOTE IS OPEN',
+              '',
+              `Voting closes at **${closesLabel}** (${voteMinutes} minutes from now).`,
+              '',
+              '## How to vote',
+              '',
+              'Scroll to the comments below. Each of the 16 constraints is its own comment.',
+              'React 👍 on the **one** you want. That is your whole vote.',
+              '',
+              '## Rules',
+              '',
+              `- **One vote each.** ${competitorCount} competitors, ${competitorCount} votes.`,
+              '- 👍 reactions on **more than one** comment void your entire vote. The tally',
+              '  workflow detects this and names you. Pick one.',
+              '- Most 👍 wins. Ties are broken by the organizer flipping a coin on camera,',
+              '  recorded in this thread.',
+              '- The winning constraint applies to **every** design for the final 12 hours.',
+              '',
+              '## What happens after',
+              '',
+              'The winner is announced in this thread and on the',
+              '[live dashboard](https://claws02.github.io/electromechanical-hackathon-2026/).',
+              'Then you have 12 hours to make your design satisfy it. Pivoting hard is expected —',
+              'judges reward honest documentation of what the twist forced you to change.',
+              '',
+              '---',
+              '',
+              '_Auto-posted by the `twist-vote` workflow._',
+            ].join('\n');
+
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '⚡ HOUR 12 TWIST VOTE — React 👍 to choose your constraint',
+              body,
+              labels: ['twist-vote'],
+            });
+
+            core.notice(`Created twist vote issue #${issue.data.number}`);
+
+            // One comment per constraint, grouped by category for readability.
+            let lastCat = null;
+            for (const t of twists) {
+              const header = t.cat !== lastCat ? `### ${t.cat} Constraints\n\n` : '';
+              lastCat = t.cat;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.data.number,
+                body: `${header}## \`${t.id}\` — ${t.name}\n\n> ${t.rule}\n\n**React 👍 to this comment to vote for ${t.id}.**`,
+              });
+            }
+
+            core.notice(`Posted ${twists.length} constraint comments.`);
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.data.number,
+              body: [
+                '---',
+                '',
+                `☝️ All ${twists.length} constraints are above. React 👍 to exactly one.`,
+                '',
+                `**Voting closes ${closesLabel}.** The organizer runs the`,
+                '`twist-tally` workflow at that point to count and announce.',
+              ].join('\n'),
+            });
+
+            core.summary
+              .addHeading('Twist vote opened')
+              .addRaw(`Issue #${issue.data.number} · ${twists.length} constraints · closes ${closesLabel}`)
+              .write();

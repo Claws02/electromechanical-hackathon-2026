@@ -1,0 +1,25 @@
+{
+  "$comment": "Source of truth for the 16 Hour-12 twist constraints. Read by .github/workflows/twist-vote.yml to auto-post the vote. If you edit IDs here, mirror them in the TWISTS array in docs/app.js — the config-consistency job checks that the ID sets match.",
+  "twists": [
+    { "id": "P1", "cat": "Power",        "name": "Battery Only",         "rule": "Must run on a single CR2032 or AA cell. No wall power, no USB power bank." },
+    { "id": "P2", "cat": "Power",        "name": "Solar Powered",        "rule": "Must function solely on ambient light energy harvesting. No backup battery." },
+    { "id": "P3", "cat": "Power",        "name": "5mW Budget",           "rule": "Total average device power consumption cannot exceed 5mW. Document your power budget." },
+
+    { "id": "C1", "cat": "Connectivity", "name": "No WiFi",              "rule": "Remove all WiFi/internet connectivity. BLE or LoRa communication only." },
+    { "id": "C2", "cat": "Connectivity", "name": "Offline Only",         "rule": "No cloud, no app, no phone. All sensing, logic, and output must be local to the device." },
+    { "id": "C3", "cat": "Connectivity", "name": "One-Wire Output",      "rule": "The only output to the user is a single LED or a single buzzer. Nothing else." },
+
+    { "id": "M1", "cat": "Mechanical",   "name": "No Screws",            "rule": "Enclosure must be entirely tool-free: snap fits, press fits, magnets, or friction only." },
+    { "id": "M2", "cat": "Mechanical",   "name": "100mm Cube Max",       "rule": "The entire assembled device, including external sensors and antennas, must fit inside a 100x100x100mm cube." },
+    { "id": "M3", "cat": "Mechanical",   "name": "Repurposed Enclosure", "rule": "The housing must reuse an existing household object (tin, pill bottle, jar). Document what you used." },
+
+    { "id": "$1", "cat": "Cost",         "name": "$15 BOM Cap",          "rule": "Total bill of materials, including PCB and enclosure, cannot exceed $15 USD. Include a priced BOM." },
+    { "id": "$2", "cat": "Cost",         "name": "3-Component Rule",     "rule": "Active component count (ICs, MCUs, modules, sensors) is capped at 3 total." },
+    { "id": "$3", "cat": "Cost",         "name": "No Microcontroller",   "rule": "Core logic must use discrete analog circuitry only: 555 timers, op-amps, comparators, transistors. No MCU, no FPGA." },
+
+    { "id": "S1", "cat": "Scope",        "name": "Add Accessibility",    "rule": "Must be fully operable by someone with limited or no vision, or limited hand mobility. Document the accessibility features." },
+    { "id": "S2", "cat": "Scope",        "name": "Child Safe",           "rule": "Safe for unsupervised use around children under 5. No exposed conductors, all voltages under 5V, no sharp edges, no small parts." },
+    { "id": "S3", "cat": "Scope",        "name": "Rental Friendly",      "rule": "Cannot attach permanently to any surface. No adhesives, no screws into walls, no drilled holes." },
+    { "id": "S4", "cat": "Scope",        "name": "Fail Safe Mode",       "rule": "On any power loss or system failure, the device must automatically transition to a defined safe state. Document the behavior." }
+  ]
+}

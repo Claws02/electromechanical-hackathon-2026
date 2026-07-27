@@ -1,0 +1,347 @@
+name: Tally Final Scores
+
+# Reads every judge's score block from the scoring issues, applies additive
+# mean-centering to correct for judge bias, ranks, and posts a results issue.
+#
+# Judges submit scores as a COMMENT containing a ```yaml block (see admin/scoring-sheet.md).
+# Comments, not issue bodies, because a judge without write access cannot edit an issue
+# body the organizer created — but anyone can comment.
+#
+# Run manually once all scores are in. See admin/judging-protocol.md for the math.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Compute and print to the run summary without posting a results issue'
+        required: false
+        default: 'false'
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  tally:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Parse, normalize, and publish results
+        uses: actions/github-script@v7
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const cfg = JSON.parse(fs.readFileSync('event.config.json', 'utf8'));
+
+            const CRITERIA = cfg.judging.criteria;
+            const PENALTY  = cfg.judging.missingDeliverablePenalty;
+            const bySlug   = new Map(cfg.competitors.map(c => [c.slug, c]));
+            const round1   = n => Math.round(n * 10) / 10;
+
+            // Collapse to comparable form: 'Friend-Two', 'friend two', 'FriendTwo'
+            // and 'friendtwo' all become 'friendtwo'. Without this, a judge whose
+            // GitHub handle is 'friendtwo' was NOT matched to slug 'friend-two',
+            // and their self-score slipped through.
+            const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            // Peer judging only works if we can tell who is who. If the GitHub
+            // handles are still placeholders, self-score detection is blind — so
+            // fail closed rather than silently letting someone score themselves.
+            const unset = cfg.competitors.filter(c => !c.github || /^replace/i.test(c.github));
+            if (unset.length > 0) {
+              core.setFailed(
+                'event.config.json still has placeholder GitHub usernames for: ' +
+                unset.map(c => c.name).join(', ') +
+                '. Self-scoring cannot be detected without real handles, so the tally is refusing ' +
+                'to run. Fill in the `github` field for every competitor and re-run.'
+              );
+              return;
+            }
+
+            // ── Extract a score block from a markdown body ──────────────────────
+            // Deliberately regex rather than a YAML parser: the block shape is fixed and
+            // documented, and a hand-edited block is more likely to have inconsistent
+            // indentation than wrong keys. Regex tolerates the former.
+            function parseBlock(text) {
+              if (!text) return null;
+              const fence = text.match(/```(?:ya?ml)?\s*\n([\s\S]*?)```/);
+              if (!fence) return null;
+              const raw = fence[1];
+
+              const pick = key => {
+                const m = raw.match(new RegExp(`^\\s*${key}\\s*:\\s*([^\\s#]+)`, 'm'));
+                return m ? m[1].trim() : null;
+              };
+
+              const judge      = pick('judge');
+              const competitor = pick('competitor');
+              if (!judge || !competitor) return null;
+              if (/^(your-github-username|competitor-folder-slug)$/.test(judge)) return null;
+              if (/^(your-github-username|competitor-folder-slug)$/.test(competitor)) return null;
+
+              const scores = {};
+              let sawAny = false;
+              for (const c of CRITERIA) {
+                const v = pick(c.key);
+                const n = v === null ? NaN : Number(v);
+                if (!Number.isFinite(n)) { scores[c.key] = 0; continue; }
+                scores[c.key] = Math.max(0, Math.min(c.max, n)); // clamp to the band
+                sawAny = true;
+              }
+              if (!sawAny) return null;
+
+              const missingRaw = Number(pick('missing_deliverables'));
+              const twistRaw   = (pick('twist_addressed') || 'true').toLowerCase();
+
+              return {
+                judge: judge.replace(/^@/, ''),
+                competitor,
+                scores,
+                missing: Number.isFinite(missingRaw) ? Math.max(0, missingRaw) : 0,
+                twistAddressed: twistRaw !== 'false',
+              };
+            }
+
+            // ── Collect submissions from every scoring issue's comments ─────────
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, labels: 'scoring', state: 'all', per_page: 100,
+            });
+
+            if (issues.length === 0) {
+              core.setFailed('No issues labeled `scoring` found. Run the post-deadline workflow first.');
+              return;
+            }
+
+            const entries = new Map(); // "judge|competitor" -> entry (last wins)
+            const problems = [];
+
+            for (const issue of issues) {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: issue.number, per_page: 100,
+              });
+
+              for (const c of comments) {
+                const parsed = parseBlock(c.body);
+                if (!parsed) continue;
+                parsed.sourceUrl = c.html_url;
+                parsed.commentAuthor = c.user?.login ?? 'unknown';
+
+                if (!bySlug.has(parsed.competitor)) {
+                  problems.push(`Unknown competitor slug \`${parsed.competitor}\` in [a comment](${c.html_url}) — ignored.`);
+                  continue;
+                }
+
+                // Rule 1: nobody scores themselves. Checked three ways against the
+                // normalized forms — handle, slug, and display name — because a judge
+                // may write any of them in the `judge` field.
+                const self = bySlug.get(parsed.competitor);
+                const j = norm(parsed.judge);
+                const isSelf =
+                  j === norm(self.github) ||
+                  j === norm(self.slug) ||
+                  j === norm(self.name);
+                if (isSelf) {
+                  problems.push(`🚫 Self-score rejected: \`${parsed.judge}\` scored \`${parsed.competitor}\` ([link](${c.html_url})).`);
+                  continue;
+                }
+
+                // Key on the normalized handle so one judge writing their name two
+                // different ways does not become two judges.
+                parsed.judgeKey = j;
+                entries.set(`${j}|${parsed.competitor}`, parsed);
+              }
+            }
+
+            if (entries.size === 0) {
+              core.setFailed('Found scoring issues but no parseable score blocks in their comments. Check the fence and key spelling against admin/scoring-sheet.md.');
+              return;
+            }
+
+            // ── Totals, with penalties and the twist cap ────────────────────────
+            const rows = [...entries.values()].map(e => {
+              const capped = {};
+              let cappedNote = false;
+
+              for (const c of CRITERIA) {
+                let v = e.scores[c.key];
+                // Twist not addressed caps "Does It Work" at 15 (judging-protocol.md rule 6).
+                if (c.key === 'does_it_work' && !e.twistAddressed && v > 15) {
+                  v = 15;
+                  cappedNote = true;
+                }
+                capped[c.key] = v;
+              }
+
+              const subtotal = CRITERIA.reduce((s, c) => s + capped[c.key], 0);
+              const penalty  = e.missing * PENALTY;
+              return { ...e, capped, subtotal, penalty, total: Math.max(0, subtotal - penalty), cappedNote };
+            });
+
+            // ── Additive mean-centering ────────────────────────────────────────
+            // A judge who scored only ONE submission is left uncorrected: with n=1 the
+            // judge mean IS that score, so centering would collapse it to the global
+            // mean and delete the information entirely. Bias needs >=2 observations to
+            // estimate. See admin/judging-protocol.md#normalization.
+            const G = rows.reduce((s, r) => s + r.total, 0) / rows.length;
+
+            const judgeStats = new Map();   // judgeKey -> { label, totals[] }
+            for (const r of rows) {
+              if (!judgeStats.has(r.judgeKey)) judgeStats.set(r.judgeKey, { label: r.judge, totals: [] });
+              judgeStats.get(r.judgeKey).totals.push(r.total);
+            }
+
+            const offsets = new Map();
+            for (const [key, { totals }] of judgeStats) {
+              if (totals.length < 2) { offsets.set(key, 0); continue; }
+              const m = totals.reduce((a, b) => a + b, 0) / totals.length;
+              offsets.set(key, G - m);
+            }
+
+            for (const r of rows) r.adjusted = r.total + offsets.get(r.judgeKey);
+
+            // ── Final ranking ──────────────────────────────────────────────────
+            const finals = [...bySlug.keys()].map(slug => {
+              const mine = rows.filter(r => r.competitor === slug);
+              if (mine.length === 0) return { slug, scored: false, judges: 0 };
+
+              const final = mine.reduce((s, r) => s + r.adjusted, 0) / mine.length;
+              const sub = k => mine.reduce((s, r) => s + r.capped[k], 0) / mine.length;
+
+              return {
+                slug,
+                scored: true,
+                judges: mine.length,
+                final,
+                rawAvg: mine.reduce((s, r) => s + r.total, 0) / mine.length,
+                doesItWork: sub('does_it_work'),
+                sellable: sub('sellable'),
+                missing: Math.max(...mine.map(r => r.missing)),
+                rows: mine,
+              };
+            });
+
+            // Tiebreakers: Does It Work, then Sellable, then fewer missing deliverables.
+            const ranked = finals.filter(f => f.scored).sort((a, b) =>
+              b.final - a.final ||
+              b.doesItWork - a.doesItWork ||
+              b.sellable - a.sellable ||
+              a.missing - b.missing
+            );
+            const unscored = finals.filter(f => !f.scored);
+
+            // ── Build the results body ─────────────────────────────────────────
+            const medal = i => ['🥇', '🥈', '🥉'][i] ?? `${i + 1}.`;
+            const nameOf = slug => bySlug.get(slug)?.name ?? slug;
+
+            const out = [
+              `# 🏆 Final Results — ${cfg.event.name}`,
+              '',
+              `**${ranked.length}** submission${ranked.length !== 1 ? 's' : ''} scored by **${judgeStats.size}** judge${judgeStats.size !== 1 ? 's' : ''} · ${entries.size} score card${entries.size !== 1 ? 's' : ''} counted.`,
+              '',
+              '## Leaderboard',
+              '',
+              '| | Competitor | Final | Raw avg | Judges |',
+              '|:--:|---|:--:|:--:|:--:|',
+              ...ranked.map((f, i) =>
+                `| ${medal(i)} | **${nameOf(f.slug)}** | **${round1(f.final)}** | ${round1(f.rawAvg)} | ${f.judges} |`
+              ),
+            ];
+
+            if (ranked.length > 0) {
+              out.push(
+                '',
+                `> **Winner: ${nameOf(ranked[0].slug)}** — ${round1(ranked[0].final)}/100`,
+                '',
+                '## Category breakdown',
+                '',
+                '| Competitor | ' + CRITERIA.map(c => `${c.label} /${c.max}`).join(' | ') + ' | Penalty | Total |',
+                '|---|' + CRITERIA.map(() => ':--:').join('|') + '|:--:|:--:|',
+                ...ranked.map(f => {
+                  const avg = k => round1(f.rows.reduce((s, r) => s + r.capped[k], 0) / f.rows.length);
+                  const pen = Math.max(...f.rows.map(r => r.penalty));
+                  return `| ${nameOf(f.slug)} | ` + CRITERIA.map(c => avg(c.key)).join(' | ') +
+                         ` | −${pen} | ${round1(f.rawAvg)} |`;
+                }),
+                '',
+                '_Category values are means of the judges\' scores, before bias correction._',
+              );
+            }
+
+            // Show the correction so it is auditable rather than a black box.
+            out.push(
+              '',
+              '## Judge bias correction',
+              '',
+              `Global mean **G = ${round1(G)}**. Each judge's scores are shifted by \`G − (their mean)\`,`,
+              'which removes systematic harshness or generosity. Method and rationale:',
+              '[judging-protocol.md](../../blob/main/admin/judging-protocol.md#normalization).',
+              '',
+              '| Judge | Cards | Their mean | Offset applied |',
+              '|---|:--:|:--:|:--:|',
+              ...[...judgeStats.entries()].map(([key, { label: who, totals }]) => {
+                const m = totals.reduce((a, b) => a + b, 0) / totals.length;
+                const off = offsets.get(key);
+                const shown = totals.length < 2
+                  ? '_n=1, uncorrected_'
+                  : `${off >= 0 ? '+' : '−'}${round1(Math.abs(off))}`;
+                return `| @${who} | ${totals.length} | ${round1(m)} | ${shown} |`;
+              }),
+            );
+
+            const capped = rows.filter(r => r.cappedNote);
+            if (capped.length > 0) {
+              out.push(
+                '',
+                '## ⚡ Twist caps applied',
+                '',
+                'Judges marked `twist_addressed: false`, so "Does It Work" was capped at 15:',
+                '',
+                ...capped.map(r => `- ${nameOf(r.competitor)} — scored by @${r.judge} ([card](${r.sourceUrl}))`),
+              );
+            }
+
+            if (unscored.length > 0) {
+              out.push(
+                '',
+                '## ⚠️ Not scored',
+                '',
+                ...unscored.map(f => `- **${nameOf(f.slug)}** — no valid score cards found.`),
+              );
+            }
+
+            if (problems.length > 0) {
+              out.push('', '## ⚠️ Rejected or ignored', '', ...problems.map(p => `- ${p}`));
+            }
+
+            out.push(
+              '',
+              '---',
+              '',
+              'Scores are final once this issue is posted. Discussion, calibration talk, and the',
+              'retro are open now — see the runbook\'s post-event section.',
+              '',
+              '_Auto-tallied by the `tally-scores` workflow._',
+            );
+
+            const body = out.join('\n');
+
+            core.summary.addRaw(body).write();
+
+            if (process.env.DRY_RUN === 'true') {
+              core.notice('Dry run — no issue posted. Results are in the run summary.');
+              return;
+            }
+
+            const created = await github.rest.issues.create({
+              owner, repo,
+              title: `🏆 Final Results — ${cfg.event.edition}`,
+              body,
+              labels: ['results', 'announcement'],
+            });
+
+            core.notice(`Posted results: ${created.data.html_url}`);

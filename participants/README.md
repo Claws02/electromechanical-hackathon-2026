@@ -22,12 +22,21 @@ See [`CONTRIBUTING.md`](../CONTRIBUTING.md) for step-by-step submission instruct
 
 ---
 
-## Registered Participants
+## Competitors
 
-| Participant | Folder | Status |
-|-------------|--------|--------|
-| Participant 1 | [participant-1/](participant-1/) | Pending |
-| Participant 2 | [participant-2/](participant-2/) | Pending |
-| Participant 3 | [participant-3/](participant-3/) | Pending |
-| Participant 4 | [participant-4/](participant-4/) | Pending |
-| Participant 5 | [participant-5/](participant-5/) | Pending |
+Folder names must match the `slug` values in
+[`event.config.json`](../event.config.json) — the workflows key off them.
+
+| Competitor | Folder | Challenge | Status |
+|------------|--------|:---:|--------|
+| Caleb | `caleb/` | drawn at T-0 | Pending |
+| Friend One | `friend-one/` | drawn at T-0 | Pending |
+| Friend Two | `friend-two/` | drawn at T-0 | Pending |
+
+> **Organizer:** replace the placeholder names and slugs in `event.config.json`, `docs/app.js`,
+> and this table before T-0. CI fails if the first two disagree. Note that the `tally-scores`
+> workflow **refuses to run** while the `github` handles in the config are still placeholders —
+> self-scoring cannot be detected without them.
+
+Folders are created by the competitor's first push; see
+[CONTRIBUTING.md](../CONTRIBUTING.md) for how to do that with no git experience.

@@ -1,5 +1,5 @@
 name: Submission Tracker
-description: Organizer creates one of these to enable automated submission status comments.
+description: Organizer creates ONE of these before T-0 to enable automated submission status comments.
 title: "[TRACKER] Hackathon Submission Status"
 labels: ["submission-tracker"]
 assignees: []
@@ -7,35 +7,76 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## Submission Tracker Issue
+        ## Submission Tracker
 
-        Create this issue **before the hackathon starts**. The automated submission validator
-        will post a comment here every time a participant pushes to their folder.
+        Create this issue **before the hackathon starts**. The `validate-submissions` workflow
+        looks for an open issue labeled `submission-tracker` and posts a deliverables checklist
+        here on every push to `participants/`.
 
-        Do **not** close this issue until after judging is complete.
+        Without this issue the validator still runs and still reports in the Actions run
+        summary — it just skips the comment. No red X either way.
+
+        **Keep exactly one open**, and do not close it until judging is complete.
 
   - type: input
-    id: event-date
+    id: event-window
     attributes:
-      label: Event Date
-      placeholder: "May 18–19, 2026"
+      label: Event window
+      placeholder: "Aug 21 17:00 CDT → Aug 22 17:00 CDT, 2026"
     validations:
       required: true
 
-  - type: checkboxes
-    id: participants
+  - type: textarea
+    id: roster
     attributes:
-      label: Registered Participants
-      description: Check off participants as they register.
+      label: Roster and folder slugs
+      description: >-
+        Must match the `slug` values in event.config.json and docs/app.js — the workflows key
+        off them. One per line as `Name — slug — @github-handle`.
+      placeholder: |
+        Caleb — caleb — @Claws02
+        Friend One — friend-one — @handle
+        Friend Two — friend-two — @handle
+    validations:
+      required: true
+
+  - type: textarea
+    id: assignments
+    attributes:
+      label: Challenge assignments (fill in at T-0)
+      description: >-
+        Paste the output of the assignment command from challenges/README.md, including the
+        seed commit SHA. This is the permanent record — anyone can re-run it against that SHA
+        and verify the draw was not rigged.
+      placeholder: |
+        Seed commit: a1b2c3d...
+        caleb      -> Challenge #4
+        friend-one -> Challenge #2
+        friend-two -> Challenge #5
+
+  - type: input
+    id: winning-twist
+    attributes:
+      label: Winning Hour-12 twist (fill in at T+12h30m)
+      placeholder: "M2 — 100mm Cube Max"
+
+  - type: checkboxes
+    id: pre-flight
+    attributes:
+      label: Pre-event checklist
+      description: Full version with rationale in admin/organizer-runbook.md.
       options:
-        - label: Participant 1
-        - label: Participant 2
-        - label: Participant 3
-        - label: Participant 4
-        - label: Participant 5
+        - label: Real names, slugs, and GitHub handles set in `event.config.json` AND `docs/app.js`
+        - label: Start/end datetimes correct, **with UTC offsets**, in both files
+        - label: CI green — the `config-consistency` job passes
+        - label: GitHub Pages is deploying from `docs/` and the dashboard loads
+        - label: Countdown on the dashboard shows the right time remaining
+        - label: All three competitors can push to the repo
+        - label: Everyone has read the challenge briefs and the judging protocol
+        - label: Assignment method agreed (commit-hash draw vs. free pick) before T-0
 
   - type: textarea
     id: notes
     attributes:
-      label: Organizer Notes
-      placeholder: "Any setup notes, participant contact info, special instructions..."
+      label: Organizer notes
+      placeholder: "Setup notes, contact info, special instructions, anything that came up..."
