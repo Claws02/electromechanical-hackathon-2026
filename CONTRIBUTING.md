@@ -14,7 +14,9 @@ Open: `https://github.com/claws02/electromechanical-hackathon-2026`
 
 ### Step 2 — Navigate to the Participants Folder
 
-Click on the `participants/` folder, then click on your folder (e.g., `participant-1/`).
+Click on the `participants/` folder, then click on your folder (e.g. `caleb/`). Your folder name
+is the `slug` listed for you in [`event.config.json`](event.config.json) — use exactly that, since
+the automation keys off it.
 
 > **If your folder doesn't exist yet**, see the "Creating Your Folder" section below.
 
@@ -121,10 +123,26 @@ If files are missing, the bot will post a comment on the main tracking issue lis
 
 ## Deadline
 
-All files must be committed **before T+24h (May 19, 2026 · 5:00 PM)**.
+All files must be committed **before T+24h — Saturday, August 22, 2026 · 5:00 PM CDT**.
 
-Commits after the deadline will be visible but will not count for judging.
+Commits after the deadline stay visible in the repo but do not count for judging. The
+`post-deadline` workflow timestamps the close, so there is no ambiguity about what landed in time.
+
+**Do not save the whole push for Hour 23.** Push each deliverable as you finish it. Three reasons:
+the validator tells you what is still missing, a late merge conflict is a disaster at T+23h, and
+the tiebreak rules reward an earlier final commit.
 
 ---
 
-*Questions? Open an issue or ask in the hackathon chat.*
+## Missing a Deliverable
+
+Each missing file costs **3 points off your total** — it does not zero out a category. If you are
+out of time, **ship six strong deliverables rather than seven thin ones.** That is the scoring-optimal
+choice and it is deliberately designed that way.
+
+If you are going to miss one, say so in your `README.md`. Judges score honesty about gaps more
+kindly than a padded file that pretends to be finished.
+
+---
+
+*Questions? Open an issue.*

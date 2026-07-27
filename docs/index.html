@@ -4,7 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Electromechanical Design Hackathon 2026</title>
-  <meta name="description" content="24-hour competitive electromechanical design sprint. Five engineers, five challenges, one twist.">
+  <meta name="description" content="A 24-hour competitive electromechanical design sprint. Three engineers, five challenges, one twist at the halfway mark. August 21–22, 2026.">
+  <meta name="author" content="CLAW Engineering">
+  <meta name="theme-color" content="#0b0e14">
+  <link rel="canonical" href="https://claws02.github.io/electromechanical-hackathon-2026/">
+
+  <!-- Favicon: inline so there is no extra request and nothing to 404. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b0e14'/%3E%3Cpath d='M58 6 28 56h19l-5 38 30-50H53z' fill='%23f5b820'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="og-image.png">
+
+  <!-- Open Graph / Twitter: this link gets shared in a group chat, so it needs a card. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Electromechanical Design Hackathon 2026">
+  <meta property="og:title" content="Electromechanical Design Hackathon 2026">
+  <meta property="og:description" content="24 hours. Three engineers. Five challenges. One twist at Hour 12 that changes every design.">
+  <meta property="og:url" content="https://claws02.github.io/electromechanical-hackathon-2026/">
+  <meta property="og:image" content="https://claws02.github.io/electromechanical-hackathon-2026/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Electromechanical Design Hackathon 2026 — 24-hour engineering sprint, August 21 to 22, 2026.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Electromechanical Design Hackathon 2026">
+  <meta name="twitter:description" content="24 hours. Three engineers. Five challenges. One twist at Hour 12 that changes every design.">
+  <meta name="twitter:image" content="https://claws02.github.io/electromechanical-hackathon-2026/og-image.png">
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,11 +40,11 @@
       Hackathon 2026
     </div>
     <ul class="nav-links">
-      <li><a href="#challenge">Challenge</a></li>
+      <li><a href="#challenge">Challenges</a></li>
       <li><a href="#timeline">Timeline</a></li>
       <li><a href="#twist">Twist</a></li>
       <li><a href="#submit">Submit</a></li>
-      <li><a href="#rubric">Rubric</a></li>
+      <li><a href="#rubric">Judging</a></li>
       <li><a href="#participants">Board</a></li>
     </ul>
     <a class="nav-cta" href="https://github.com/claws02/electromechanical-hackathon-2026" target="_blank" rel="noopener">
@@ -44,28 +67,30 @@
       <span class="hero-title-accent">Design Hackathon</span>
     </h1>
 
-    <p class="hero-sub" id="js-sub">Five engineers. Five challenges. One twist. One winner.</p>
-    <p class="hero-date" id="js-date">
-      <span>May 18, 2026 · 17:00</span> — <span>May 19, 2026 · 17:00</span>
-    </p>
+    <p class="hero-sub" id="js-sub">Three engineers. Five challenges. One twist. One winner.</p>
+    <!-- Dates are rendered by app.js from the same Date objects that drive the
+         countdown, so the two can never disagree. Do not hardcode them here. -->
+    <p class="hero-date" id="js-date"></p>
 
     <!-- Countdown -->
     <div class="countdown-box" id="js-countdown">
       <div class="cd-header" id="cd-label">Hackathon Starts In</div>
       <div class="cd-row">
+        <!-- Unit labels are set by app.js: far from the event the readout is
+             Days/Hours/Min, and inside 48 hours it switches to Hours/Min/Sec. -->
         <div class="cd-cell">
           <span class="cd-digits" id="cd-h">00</span>
-          <span class="cd-unit">Hours</span>
+          <span class="cd-unit" id="cd-u1">Hours</span>
         </div>
         <div class="cd-sep">:</div>
         <div class="cd-cell">
           <span class="cd-digits" id="cd-m">00</span>
-          <span class="cd-unit">Min</span>
+          <span class="cd-unit" id="cd-u2">Min</span>
         </div>
         <div class="cd-sep">:</div>
         <div class="cd-cell">
           <span class="cd-digits" id="cd-s">00</span>
-          <span class="cd-unit">Sec</span>
+          <span class="cd-unit" id="cd-u3">Sec</span>
         </div>
       </div>
       <div class="cd-status" id="cd-status"></div>
@@ -98,18 +123,29 @@
 <!-- ── Example Challenge ────────────────────────────────────────────────────── -->
 <section id="challenge">
   <div class="container">
-    <div class="section-label">How it works</div>
-    <h2 class="section-title">What You Receive at T-0</h2>
+    <div class="section-label">The prompts</div>
+    <h2 class="section-title">Five Challenges</h2>
     <p class="section-desc">
-      When the clock starts, each participant is randomly assigned one of five challenge prompts.
-      Below is a complete example of what that brief looks like — your actual challenge will follow
-      exactly this format.
+      All five briefs are published in full — nothing is hidden, and no requirement changes
+      after T-0. At the start each competitor draws one, assigned from the T-0 commit hash so
+      the result is random and independently verifiable. Difficulty is guidance only;
+      <strong>scoring is not adjusted for it</strong>.
+    </p>
+
+    <div class="challenge-grid" id="challenge-grid">
+      <!-- Rendered by app.js -->
+    </div>
+
+    <h3 class="subsection-title">What a brief looks like</h3>
+    <p class="section-desc">
+      Every brief has the same seven sections. Here is Challenge&nbsp;#1 in full, so you know
+      exactly what you are getting at T-0.
     </p>
 
     <div class="example-card" id="js-example-card">
       <div class="example-header">
-        <span class="example-badge">Example Brief</span>
-        <span class="example-meta">Assigned randomly · Revealed at T+0h</span>
+        <span class="example-badge">Full Brief</span>
+        <span class="example-meta">One of five · Drawn at T+0h</span>
       </div>
 
       <div class="example-body">
@@ -253,9 +289,10 @@
     <div class="section-label">Hour 12</div>
     <h2 class="section-title">The Twist</h2>
     <p class="section-desc">
-      16 constraints. 5 voters. One winner — applied to every design simultaneously.
-      The constraint is announced within 30 minutes of Hour 12 and must be reflected
-      in all of your final deliverables.
+      16 constraints. Three voters. One winner — applied to every design at once.
+      Voting opens at Hour 12 and closes 30 minutes later. Whatever wins must be
+      reflected in your final deliverables; a submission that ignores it is capped
+      at 15&nbsp;of&nbsp;25 on <em>Does It Work</em>.
     </p>
 
     <!-- Status banner (shown once hackathon starts) -->
@@ -358,11 +395,12 @@
 <section id="rubric">
   <div class="container">
     <div class="section-label">Judging</div>
-    <h2 class="section-title">Scoring Rubric</h2>
+    <h2 class="section-title">Six Criteria</h2>
     <p class="section-desc">
-      Judges score each category independently. Scores are averaged across all judges.
-      Full per-category criteria in
-      <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/admin/scoring-sheet.md" target="_blank" rel="noopener">admin/scoring-sheet.md</a>.
+      Everyone competing is also judging, so the rules exist to keep that honest:
+      <strong>you cannot score yourself</strong>, every category needs a written comment,
+      and you submit your card before discussing submissions with the other judge.
+      Scores are then bias-corrected across judges so one harsh rater cannot decide the outcome.
     </p>
 
     <div class="rubric-list" id="rubric-list">
@@ -373,6 +411,32 @@
       <span class="rubric-total-label">Total possible score</span>
       <span class="rubric-total-pts">100 pts</span>
     </div>
+
+    <div class="judging-notes">
+      <div class="jn-item">
+        <div class="jn-head">Missing deliverable</div>
+        <div class="jn-body">−3 points off the total, each. Six strong files beat seven thin ones.</div>
+      </div>
+      <div class="jn-item">
+        <div class="jn-head">Twist ignored</div>
+        <div class="jn-body">Does It Work is capped at 15/25. The final 12 hours are part of the assignment.</div>
+      </div>
+      <div class="jn-item">
+        <div class="jn-head">Bias correction</div>
+        <div class="jn-body">Each judge's scores shift by the gap between their mean and the global mean.</div>
+      </div>
+      <div class="jn-item">
+        <div class="jn-head">Tiebreak order</div>
+        <div class="jn-body">Does It Work, then Sellable Product, then fewer missing files, then a coin flip on camera.</div>
+      </div>
+    </div>
+
+    <p class="section-desc rubric-footnote">
+      Full bands and the normalization math:
+      <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/admin/judging-protocol.md" target="_blank" rel="noopener">judging-protocol.md</a>
+      ·
+      <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/admin/scoring-sheet.md" target="_blank" rel="noopener">scoring-sheet.md</a>
+    </p>
   </div>
 </section>
 
@@ -380,12 +444,27 @@
 <section id="participants">
   <div class="container">
     <div class="section-label">Submissions</div>
-    <h2 class="section-title">Participant Board</h2>
+    <h2 class="section-title">The Board</h2>
     <p class="section-desc">
-      Live submission status. Organizer: update the <code>PARTICIPANTS</code> array in
-      <code>docs/app.js</code> to set names, assigned challenges, and status.
+      Who's in, what they drew, and where their submission stands.
     </p>
     <div class="participants-grid" id="participants-grid">
+      <!-- Rendered by app.js -->
+    </div>
+  </div>
+</section>
+
+<!-- ── Results ───────────────────────────────────────────────────────────────── -->
+<!-- Hidden until RESULTS is populated in app.js after the tally-scores workflow runs. -->
+<section id="results">
+  <div class="container">
+    <div class="section-label">Final</div>
+    <h2 class="section-title">Results</h2>
+    <p class="section-desc">
+      Bias-corrected final scores. Raw averages and the full per-category breakdown are
+      in the results issue on GitHub.
+    </p>
+    <div class="results-board" id="results-board">
       <!-- Rendered by app.js -->
     </div>
   </div>
@@ -445,9 +524,11 @@
     <div class="footer-inner">
       <div class="footer-links">
         <a href="https://github.com/claws02/electromechanical-hackathon-2026" target="_blank" rel="noopener">Repository</a>
+        <a href="https://github.com/claws02/electromechanical-hackathon-2026/tree/main/challenges" target="_blank" rel="noopener">Challenge Briefs</a>
         <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">How to Submit</a>
         <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/admin/twist-voting.md" target="_blank" rel="noopener">Twist Voting</a>
-        <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/admin/scoring-sheet.md" target="_blank" rel="noopener">Scoring Sheet</a>
+        <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/admin/judging-protocol.md" target="_blank" rel="noopener">Judging Protocol</a>
+        <a href="https://github.com/claws02/electromechanical-hackathon-2026/blob/main/admin/organizer-runbook.md" target="_blank" rel="noopener">Runbook</a>
       </div>
       <span class="footer-copy">Electromechanical Design Hackathon 2026</span>
     </div>

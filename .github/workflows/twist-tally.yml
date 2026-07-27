@@ -1,0 +1,208 @@
+name: Tally Hour-12 Twist Vote
+
+# Counts 👍 reactions on each constraint comment, detects double-voters,
+# announces the winner, and closes the vote.
+#
+# Run this manually when the voting window closes. Scheduled backstop fires at
+# T+12h30m = 2026-08-22 05:30 CDT = 10:30 UTC.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tiebreak:
+        description: 'On a tie, the constraint ID you flipped for (e.g. M2). Leave blank to report the tie without resolving.'
+        required: false
+        default: ''
+      close_vote:
+        description: 'Close the vote issue after tallying'
+        required: false
+        default: 'true'
+  schedule:
+    - cron: '30 10 22 8 *'
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  tally:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Count reactions and announce
+        uses: actions/github-script@v7
+        env:
+          TIEBREAK: ${{ github.event.inputs.tiebreak || '' }}
+          CLOSE_VOTE: ${{ github.event.inputs.close_vote || 'true' }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { twists } = JSON.parse(fs.readFileSync('admin/twists.json', 'utf8'));
+            const byId = new Map(twists.map(t => [t.id, t]));
+            const { owner, repo } = context.repo;
+
+            // ── Locate the open vote issue
+            const open = await github.rest.issues.listForRepo({
+              owner, repo, labels: 'twist-vote', state: 'open', per_page: 1,
+            });
+            if (open.data.length === 0) {
+              core.setFailed('No open issue labeled `twist-vote`. Run the twist-vote workflow first.');
+              return;
+            }
+            const voteIssue = open.data[0].number;
+            core.notice(`Tallying vote issue #${voteIssue}`);
+
+            // ── Read every comment, match it to a constraint, count 👍 by unique user
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: voteIssue, per_page: 100,
+            });
+
+            const tally = [];              // { id, name, votes, voters[] }
+            const votesByUser = new Map(); // login -> [ids]
+
+            for (const c of comments) {
+              // Constraint comments start with "## `ID` — Name" (a category header may precede it).
+              const m = c.body.match(/##\s+`([^`]+)`\s+—/);
+              if (!m || !byId.has(m[1])) continue;
+              const id = m[1];
+
+              const reactions = await github.paginate(github.rest.reactions.listForIssueComment, {
+                owner, repo, comment_id: c.id, per_page: 100,
+              });
+
+              // Unique logins only — a user cannot 👍 twice, but be defensive.
+              const voters = [...new Set(
+                reactions.filter(r => r.content === '+1').map(r => r.user?.login).filter(Boolean)
+              )];
+
+              for (const v of voters) {
+                if (!votesByUser.has(v)) votesByUser.set(v, []);
+                votesByUser.get(v).push(id);
+              }
+
+              tally.push({ id, name: byId.get(id).name, votes: voters.length, voters });
+            }
+
+            if (tally.length === 0) {
+              core.setFailed('Found no constraint comments on the vote issue. Was it posted by the twist-vote workflow?');
+              return;
+            }
+
+            // ── Void ballots from anyone who reacted to more than one constraint
+            const doubleVoters = [...votesByUser.entries()].filter(([, ids]) => ids.length > 1);
+            const voided = new Set(doubleVoters.map(([login]) => login));
+
+            for (const row of tally) {
+              row.validVoters = row.voters.filter(v => !voided.has(v));
+              row.validVotes = row.validVoters.length;
+            }
+
+            tally.sort((a, b) => b.validVotes - a.validVotes || a.id.localeCompare(b.id));
+
+            const topVotes = tally[0].validVotes;
+            const leaders = tally.filter(t => t.validVotes === topVotes && topVotes > 0);
+            const tiebreak = process.env.TIEBREAK.trim().toUpperCase();
+
+            let winner = null;
+            let resolution = '';
+
+            if (topVotes === 0) {
+              resolution = '**No valid votes were cast.** The organizer must pick a constraint manually and announce it in this thread.';
+            } else if (leaders.length === 1) {
+              winner = leaders[0];
+              resolution = `**${winner.id} — ${winner.name}** wins outright with ${winner.validVotes} vote${winner.validVotes !== 1 ? 's' : ''}.`;
+            } else if (tiebreak && leaders.some(l => l.id === tiebreak)) {
+              winner = leaders.find(l => l.id === tiebreak);
+              resolution = `**Tie** between ${leaders.map(l => l.id).join(', ')} at ${topVotes} votes each. Resolved by organizer coin flip: **${winner.id} — ${winner.name}**.`;
+            } else {
+              resolution = [
+                `⚠️ **TIE** between ${leaders.map(l => `\`${l.id}\` ${l.name}`).join(' and ')} at ${topVotes} votes each.`,
+                '',
+                'Not resolved automatically. Organizer: flip a coin on camera, then re-run this',
+                'workflow with the winning ID in the `tiebreak` input.',
+              ].join('\n');
+            }
+
+            // ── Build the results comment
+            const lines = [
+              '# 🗳️ Twist Vote — Results',
+              '',
+              resolution,
+              '',
+              '## Tally',
+              '',
+              '| Constraint | Name | Votes |',
+              '|---|---|:---:|',
+              ...tally
+                .filter(t => t.validVotes > 0)
+                .map(t => `| \`${t.id}\` | ${t.name} | ${t.validVotes} |`),
+            ];
+
+            if (!tally.some(t => t.validVotes > 0)) {
+              lines.push('| — | _no valid votes_ | 0 |');
+            }
+
+            if (doubleVoters.length > 0) {
+              lines.push(
+                '',
+                '## ⚠️ Voided ballots',
+                '',
+                'These voters reacted to more than one constraint, so their votes were discarded',
+                'per the rules in the vote issue:',
+                '',
+                ...doubleVoters.map(([login, ids]) => `- @${login} — reacted to ${ids.map(i => `\`${i}\``).join(', ')}`),
+              );
+            }
+
+            if (winner) {
+              lines.push(
+                '',
+                '---',
+                '',
+                `## ⚡ In effect for the final 12 hours: \`${winner.id}\` — ${winner.name}`,
+                '',
+                `> ${byId.get(winner.id).rule}`,
+                '',
+                '### What you do now',
+                '',
+                '1. Add a **"Twist Applied"** section to `01-problem-statement.md` naming the constraint',
+                '   and what it forces you to change.',
+                '2. Update `03-electrical-design.md` and/or `05-firmware-logic.md` to match.',
+                '3. Note any architectural pivot in your `README.md`.',
+                '',
+                'A submission that does not visibly address this constraint is **capped at 15/25 on',
+                '"Does It Work"** — see the [judging protocol](../../blob/main/admin/judging-protocol.md).',
+                '',
+                '**Organizer:** set `WINNING_TWIST` in `docs/app.js` to `\'' + winner.id + '\'` and push,',
+                'so the dashboard shows it.',
+              );
+            }
+
+            lines.push('', '---', '', '_Auto-tallied by the `twist-tally` workflow._');
+
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: voteIssue, body: lines.join('\n'),
+            });
+
+            // ── Close the vote once resolved
+            if (winner && process.env.CLOSE_VOTE === 'true') {
+              await github.rest.issues.update({
+                owner, repo, issue_number: voteIssue,
+                state: 'closed', state_reason: 'completed',
+              });
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: voteIssue,
+                body: '🔒 Voting is closed. Back to work — 12 hours left.',
+              });
+            }
+
+            core.summary
+              .addHeading('Twist vote tallied')
+              .addRaw(winner ? `Winner: ${winner.id} — ${winner.name} (${winner.validVotes} votes)` : 'Unresolved — see issue')
+              .addTable([
+                [{ data: 'ID', header: true }, { data: 'Name', header: true }, { data: 'Votes', header: true }],
+                ...tally.map(t => [t.id, t.name, String(t.validVotes)]),
+              ])
+              .write();

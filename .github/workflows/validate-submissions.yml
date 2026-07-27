@@ -1,26 +1,116 @@
-name: Validate Participant Submissions
+name: Validate Submissions
 
 on:
   push:
     paths:
       - 'participants/**'
+      - 'docs/app.js'
+      - 'event.config.json'
+      - 'admin/twists.json'
+  pull_request:
+    paths:
+      - 'participants/**'
+      - 'docs/app.js'
+      - 'event.config.json'
+      - 'admin/twists.json'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
 
 jobs:
-  validate:
+  # ────────────────────────────────────────────────────────────────────────────
+  # The event date and roster live in two places by design: event.config.json
+  # (read by workflows) and the CONFIG block in docs/app.js (kept inline so the
+  # dashboard has no fetch to fail). This job is what stops them from drifting.
+  # ────────────────────────────────────────────────────────────────────────────
+  config-consistency:
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      contents: read
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Validate deliverables
+      - name: Config in event.config.json matches docs/app.js
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+
+          cfg_start=$(python3 -c "import json;print(json.load(open('event.config.json'))['event']['start'])")
+          js_start=$(grep -oP "HACKATHON_START\s*=\s*new Date\('\K[^']+" docs/app.js || true)
+
+          echo "config start : $cfg_start"
+          echo "app.js start : $js_start"
+
+          if [ -z "$js_start" ]; then
+            echo "::error file=docs/app.js::Could not find HACKATHON_START. Did the CONFIG block move?"
+            fail=1
+          elif [ "$cfg_start" != "$js_start" ]; then
+            echo "::error::Start time mismatch. event.config.json says '$cfg_start', docs/app.js says '$js_start'. Update both."
+            fail=1
+          fi
+
+          # A bare timestamp with no offset is parsed in the VIEWER's local timezone,
+          # which silently gives participants in different zones different deadlines.
+          if [ -n "$js_start" ] && ! echo "$js_start" | grep -qP '(Z|[+-]\d{2}:\d{2})$'; then
+            echo "::error file=docs/app.js::HACKATHON_START has no UTC offset ('$js_start'). Without one, each viewer's browser resolves it in their own timezone. Append an offset like -05:00."
+            fail=1
+          fi
+
+          # Roster size and slugs.
+          cfg_slugs=$(python3 -c "import json;print(','.join(sorted(c['slug'] for c in json.load(open('event.config.json'))['competitors'])))")
+          js_slugs=$(grep -oP "slug:\s*'\K[^']+" docs/app.js | sort | paste -sd, -)
+
+          echo "config slugs : $cfg_slugs"
+          echo "app.js slugs : $js_slugs"
+
+          if [ "$cfg_slugs" != "$js_slugs" ]; then
+            echo "::error::Roster mismatch. event.config.json has [$cfg_slugs], docs/app.js has [$js_slugs]. Update both."
+            fail=1
+          fi
+
+          # Twist IDs must match between the JSON the workflow posts from and the
+          # list the dashboard renders.
+          json_ids=$(python3 -c "import json;print(','.join(sorted(t['id'] for t in json.load(open('admin/twists.json'))['twists'])))")
+          js_ids=$(grep -oP "id:\s*'\K[^']+" docs/app.js | sort | paste -sd, -)
+
+          if [ "$json_ids" != "$js_ids" ]; then
+            echo "::error::Twist ID mismatch. admin/twists.json has [$json_ids], docs/app.js has [$js_ids]."
+            fail=1
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo ""
+            echo "Config is inconsistent — see errors above."
+            exit 1
+          fi
+          echo "✅ Config is consistent."
+
+      - name: Dashboard JavaScript parses
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Catches syntax errors before they reach GitHub Pages, where the only
+          # symptom is a silently blank countdown.
+          node --input-type=module --check < docs/app.js
+          echo "✅ docs/app.js parses."
+
+  # ────────────────────────────────────────────────────────────────────────────
+  validate-deliverables:
+    runs-on: ubuntu-latest
+    outputs:
+      results: ${{ steps.validate.outputs.results }}
+      all_pass: ${{ steps.validate.outputs.all_pass }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check deliverables
         id: validate
         shell: bash
         run: |
-          REQUIRED_FILES=(
+          set -euo pipefail
+
+          REQUIRED=(
             "01-problem-statement"
             "02-system-architecture"
             "03-electrical-design"
@@ -32,99 +122,99 @@ jobs:
 
           RESULTS=""
           ALL_PASS=true
+          FOUND_ANY=false
 
-          for PARTICIPANT_DIR in participants/*/; do
-            NAME=$(basename "$PARTICIPANT_DIR")
-            # Skip the example template folder
-            if [ "$NAME" = "example-participant" ]; then
-              continue
-            fi
+          for DIR in participants/*/; do
+            NAME=$(basename "$DIR")
+            [ "$NAME" = "example-participant" ] && continue
+            [ "$NAME" = "reference-submission" ] && continue
+            FOUND_ANY=true
 
-            DELIVERABLES_DIR="${PARTICIPANT_DIR}deliverables"
-            MISSING=()
-            PRESENT=()
+            DELIV="${DIR}deliverables"
+            MISSING=0
+            LINES=""
 
-            for REQUIRED in "${REQUIRED_FILES[@]}"; do
-              # Accept any file extension matching the required prefix
-              FOUND=$(find "$DELIVERABLES_DIR" -maxdepth 1 -name "${REQUIRED}*" 2>/dev/null | head -1)
-              if [ -n "$FOUND" ]; then
-                PRESENT+=("✅ $REQUIRED")
+            for REQ in "${REQUIRED[@]}"; do
+              # Any extension counts — .md, .png, .pdf, .ino all satisfy the requirement.
+              if [ -d "$DELIV" ] && find "$DELIV" -maxdepth 1 -name "${REQ}*" -print -quit | grep -q .; then
+                LINES="${LINES}- ✅ ${REQ}\n"
               else
-                MISSING+=("❌ $REQUIRED")
+                LINES="${LINES}- ❌ ${REQ}\n"
+                MISSING=$((MISSING + 1))
               fi
             done
 
-            README_FOUND=$([ -f "${PARTICIPANT_DIR}README.md" ] && echo "✅" || echo "❌")
+            README_MARK=$([ -f "${DIR}README.md" ] && echo "✅" || echo "❌")
 
-            STATUS="PASS"
-            if [ ${#MISSING[@]} -gt 0 ]; then
-              STATUS="INCOMPLETE"
+            if [ "$MISSING" -eq 0 ]; then
+              STATUS="✅ COMPLETE (7/7)"
+            else
+              STATUS="⚠️ $((7 - MISSING))/7 — ${MISSING} missing"
               ALL_PASS=false
             fi
 
             RESULTS="${RESULTS}### 📁 ${NAME} — ${STATUS}\n"
-            RESULTS="${RESULTS}**README.md:** ${README_FOUND}\n\n"
-            for P in "${PRESENT[@]}"; do RESULTS="${RESULTS}- ${P}\n"; done
-            for M in "${MISSING[@]}"; do RESULTS="${RESULTS}- ${M}\n"; done
-            RESULTS="${RESULTS}\n"
+            RESULTS="${RESULTS}Overview README: ${README_MARK}\n\n${LINES}\n"
           done
 
-          if [ -z "$RESULTS" ]; then
-            RESULTS="No participant folders found (excluding example-participant)."
+          if [ "$FOUND_ANY" = false ]; then
+            RESULTS="No competitor folders yet.\n"
+            ALL_PASS=false
           fi
 
-          # Escape for GitHub Actions output
-          echo "results<<EOF" >> $GITHUB_OUTPUT
-          printf "%b" "$RESULTS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "results<<__EOF__"
+            printf "%b" "$RESULTS"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+          echo "all_pass=$ALL_PASS" >> "$GITHUB_OUTPUT"
 
-          echo "all_pass=$ALL_PASS" >> $GITHUB_OUTPUT
+          printf "%b" "$RESULTS" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Find tracking issue
-        id: find-issue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              labels: 'submission-tracker',
-              state: 'open',
-              per_page: 1,
-            });
-            if (issues.data.length > 0) {
-              return issues.data[0].number;
-            }
-            return null;
-          result-encoding: string
-
-      - name: Comment on tracking issue
-        if: steps.find-issue.outputs.result != 'null'
+  # ────────────────────────────────────────────────────────────────────────────
+  report:
+    needs: validate-deliverables
+    # Only report on real pushes to the default branch — not on PRs or forks.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment on the tracker issue
         uses: actions/github-script@v7
         env:
-          RESULTS: ${{ steps.validate.outputs.results }}
-          ALL_PASS: ${{ steps.validate.outputs.all_pass }}
-          COMMIT_SHA: ${{ github.sha }}
-          PUSHER: ${{ github.actor }}
+          RESULTS: ${{ needs.validate-deliverables.outputs.results }}
+          ALL_PASS: ${{ needs.validate-deliverables.outputs.all_pass }}
         with:
           script: |
-            const issueNumber = parseInt(process.env.ISSUE_NUMBER || '${{ steps.find-issue.outputs.result }}');
+            const { owner, repo } = context.repo;
+
+            const tracker = await github.rest.issues.listForRepo({
+              owner, repo, labels: 'submission-tracker', state: 'open', per_page: 1,
+            });
+
+            // No tracker issue is a normal state before the event starts. Log and exit
+            // cleanly rather than failing the run with a red X on the commit.
+            if (tracker.data.length === 0) {
+              core.notice('No open issue labeled `submission-tracker`. Skipping the status comment.');
+              return;
+            }
+
+            const issueNumber = tracker.data[0].number;
             const allPass = process.env.ALL_PASS === 'true';
-            const summary = allPass ? '✅ All validated folders have complete deliverables.' : '⚠️ Some deliverables are missing.';
+
             const body = [
-              `## Submission Update — Push by @${process.env.PUSHER}`,
+              `## Submission update — push by @${context.actor}`,
               '',
-              `**Commit:** \`${process.env.COMMIT_SHA.slice(0,7)}\`  `,
-              `**Status:** ${summary}`,
+              `**Commit:** \`${context.sha.slice(0, 7)}\``,
+              `**Status:** ${allPass ? '✅ All folders complete.' : '⚠️ Deliverables still missing.'}`,
               '',
-              process.env.RESULTS,
+              process.env.RESULTS || '_No results produced._',
               '---',
-              `*Auto-generated by the submission validator workflow*`,
+              '',
+              '_Auto-generated by the `validate-submissions` workflow._',
             ].join('\n');
 
             await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: parseInt('${{ steps.find-issue.outputs.result }}'),
-              body,
+              owner, repo, issue_number: issueNumber, body,
             });
+
+            core.notice(`Commented on tracker issue #${issueNumber}`);

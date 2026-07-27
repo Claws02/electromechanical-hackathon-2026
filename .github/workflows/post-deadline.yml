@@ -1,108 +1,178 @@
 name: Post-Deadline Scoring Setup
 
-# Manually triggered by the organizer at T+24h.
-# Also has a scheduled trigger at the hackathon deadline (May 19 at 17:00 UTC).
-# Adjust the cron schedule to match your local timezone offset if needed.
+# Creates one scoring issue per competitor and posts the deadline announcement.
+#
+# Scheduled for T+24h = 2026-08-22 17:00 CDT = 22:00 UTC.
+# GitHub only runs `schedule` triggers from the DEFAULT branch and can delay them
+# under load, so the runbook has the organizer fire this manually. Cron is a backstop.
+#
+# Judges do NOT edit these issues — they post their score block as a COMMENT. A judge
+# without repo write access cannot edit an issue body, but anyone can comment.
+
 on:
   workflow_dispatch:
     inputs:
       force:
-        description: 'Force run even if before deadline'
+        description: 'Run even if the deadline has not passed'
         required: false
         default: 'false'
   schedule:
-    # May 19, 2026 at 17:00 UTC — adjust to match your start time + 24h
-    - cron: '0 17 19 5 *'
+    - cron: '0 22 22 8 *'
+
+permissions:
+  issues: write
+  contents: read
 
 jobs:
   create-scoring-issues:
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      contents: read
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Discover participant folders
-        id: discover
+      - name: Check the deadline has actually passed
+        id: gate
         shell: bash
         run: |
-          PARTICIPANTS=""
-          for DIR in participants/*/; do
-            NAME=$(basename "$DIR")
-            if [ "$NAME" != "example-participant" ]; then
-              PARTICIPANTS="${PARTICIPANTS}${NAME},"
-            fi
-          done
-          # Strip trailing comma
-          PARTICIPANTS="${PARTICIPANTS%,}"
-          echo "participants=$PARTICIPANTS" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          END=$(python3 -c "import json;print(json.load(open('event.config.json'))['event']['end'])")
+          END_EPOCH=$(date -d "$END" +%s)
+          NOW_EPOCH=$(date +%s)
+          echo "Deadline: $END  ·  now: $(date -Is)"
 
-      - name: Create scoring issue per participant
+          if [ "$NOW_EPOCH" -lt "$END_EPOCH" ] && [ "${{ github.event.inputs.force }}" != "true" ]; then
+            echo "Deadline has not passed. Re-run with force=true to override."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create scoring issues and announce
+        if: steps.gate.outputs.proceed == 'true'
         uses: actions/github-script@v7
-        env:
-          PARTICIPANTS: ${{ steps.discover.outputs.participants }}
         with:
           script: |
-            const participantList = process.env.PARTICIPANTS.split(',').filter(Boolean);
-            const repoBase = `https://github.com/${context.repo.owner}/${context.repo.repo}/tree/main/participants/`;
-            const scoringTemplate = await github.rest.repos.getContent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              path: 'admin/scoring-sheet.md',
-            });
-            const template = Buffer.from(scoringTemplate.data.content, 'base64').toString('utf8');
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const cfg = JSON.parse(fs.readFileSync('event.config.json', 'utf8'));
+            const sheet = fs.readFileSync('admin/scoring-sheet.md', 'utf8');
+            const repoBase = `https://github.com/${owner}/${repo}/tree/main/participants/`;
 
-            for (const participant of participantList) {
+            // Don't duplicate scoring issues if this runs twice (cron + manual).
+            const existing = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, labels: 'scoring', state: 'all', per_page: 100,
+            });
+            const already = new Set(existing.map(i => i.title));
+
+            // Which folders actually exist — a competitor who never pushed gets no issue.
+            const present = fs.existsSync('participants')
+              ? fs.readdirSync('participants', { withFileTypes: true })
+                  .filter(d => d.isDirectory() && d.name !== 'example-participant')
+                  .map(d => d.name)
+              : [];
+
+            let created = 0;
+            const skipped = [];
+
+            for (const c of cfg.competitors) {
+              const title = `[SCORING] ${c.name}`;
+              if (already.has(title)) { skipped.push(`${c.name} (issue exists)`); continue; }
+              if (!present.includes(c.slug)) { skipped.push(`${c.name} (no folder \`${c.slug}\`)`); continue; }
+
+              const judges = cfg.competitors.filter(j => j.slug !== c.slug);
+
               const body = [
-                `# Scoring Sheet: ${participant}`,
+                `# Scoring: ${c.name}`,
                 '',
-                `**Submission folder:** [${repoBase}${participant}/](${repoBase}${participant}/)`,
+                `**Submission:** [participants/${c.slug}/](${repoBase}${c.slug}/)`,
+                '',
+                `**Judges for this submission:** ${judges.map(j => `@${j.github}`).join(', ')}`,
+                `_${c.name} may not score this submission — see`,
+                '[judging-protocol.md](../blob/main/admin/judging-protocol.md). Self-scores are',
+                'automatically rejected by the tally workflow._',
+                '',
+                '## ⚠️ How to submit your score',
+                '',
+                '**Do not edit this issue body.** Post a **new comment** on this issue containing',
+                'your filled-in ```yaml block plus your written comments. One comment per judge.',
+                'If you post twice, the later comment wins.',
+                '',
+                'Copy this and fill it in:',
+                '',
+                '```` ',
+                '```yaml',
+                'judge: your-github-username',
+                `competitor: ${c.slug}`,
+                'scores:',
+                ...cfg.judging.criteria.map(k => `  ${k.key}: 0      # out of ${k.max}`),
+                'missing_deliverables: 0',
+                'twist_addressed: true',
+                '```',
+                '````',
+                '',
+                `Scoring deadline: **${cfg.event.scoringDeadline}**. Score independently —`,
+                'do not discuss submissions with the other judge until both cards are in.',
                 '',
                 '---',
                 '',
-                template,
+                '<details>',
+                '<summary><b>Full rubric and scoring bands — click to expand</b></summary>',
+                '',
+                sheet,
+                '',
+                '</details>',
               ].join('\n');
 
               await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `[SCORING] ${participant}`,
-                body,
+                owner, repo, title, body,
                 labels: ['scoring'],
               });
-
-              console.log(`Created scoring issue for: ${participant}`);
+              created++;
+              console.log(`Created scoring issue for ${c.name}`);
             }
 
-      - name: Post deadline announcement
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const body = [
-              '# Hackathon Complete — Judging Has Begun',
-              '',
-              'The 24-hour submission window is now closed. All commits after this point will not be considered for judging.',
-              '',
-              '## What Happens Next',
-              '1. Individual scoring issues have been created for each participant (labeled `scoring`).',
-              '2. Each judge should fill in and submit their scoring issue.',
-              '3. The organizer will tally scores and announce the winner.',
-              '',
-              '## Results Timeline',
-              '- Score submissions due: within 48 hours',
-              '- Winner announced: via pinned issue',
-              '',
-              '---',
-              '*This message was auto-generated by the post-deadline workflow.*',
-            ].join('\n');
+            // ── Deadline announcement
+            const announcementTitle = '🏁 Submissions Closed — Judging Is Open';
+            if (!already.has(announcementTitle)) {
+              await github.rest.issues.create({
+                owner, repo,
+                title: announcementTitle,
+                body: [
+                  '# Submissions are closed',
+                  '',
+                  `The 24-hour window ended at **${cfg.event.end}**. Commits after this point stay`,
+                  'in the repo but are not judged.',
+                  '',
+                  '## What happens now',
+                  '',
+                  `1. A scoring issue (labeled \`scoring\`) exists for each competitor — ${created} created.`,
+                  '2. Each judge posts **one comment per submission** with their score block.',
+                  '   You score everyone **except yourself**.',
+                  '3. **Score before discussing.** Independent scores are the whole point; once you',
+                  '   have heard the other judge\'s take, your card is no longer independent.',
+                  `4. All cards due by **${cfg.event.scoringDeadline}**.`,
+                  '5. The organizer runs the `tally-scores` workflow, which bias-corrects across',
+                  '   judges and posts the leaderboard.',
+                  '',
+                  '## Reminders',
+                  '',
+                  '- Every category needs a **written comment**, not just a number.',
+                  '- A submission that ignores the Hour-12 twist is capped at 15/25 on "Does It Work".',
+                  '- Missing deliverables cost 3 points each off the total, not a zeroed category.',
+                  '',
+                  'Rules: [judging-protocol.md](../blob/main/admin/judging-protocol.md) ·',
+                  'Rubric: [scoring-sheet.md](../blob/main/admin/scoring-sheet.md)',
+                  '',
+                  '---',
+                  '',
+                  '_Auto-posted by the `post-deadline` workflow._',
+                ].join('\n'),
+                labels: ['announcement'],
+              });
+            }
 
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '🏁 Hackathon Deadline Reached — Judging Open',
-              body,
-              labels: ['announcement'],
-            });
+            core.summary
+              .addHeading('Post-deadline setup complete')
+              .addRaw(`Created ${created} scoring issue(s).`)
+              .addRaw(skipped.length ? `\n\nSkipped: ${skipped.join(', ')}` : '')
+              .write();

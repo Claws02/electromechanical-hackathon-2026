@@ -820,6 +820,154 @@ footer {
 .footer-links a { font-size: .8rem; color: var(--muted); }
 .footer-copy { font-size: .78rem; color: var(--subtle); }
 
+/* ── Hero date: canonical timezone line ───────────────────────────────────── */
+.date-tz {
+  display: block;
+  margin-top: 6px;
+  font-size: .72rem;
+  color: var(--subtle);
+  letter-spacing: .04em;
+}
+
+/* ── Challenge grid ───────────────────────────────────────────────────────── */
+.subsection-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  margin: 64px 0 12px;
+  color: var(--text);
+}
+
+.challenge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(268px, 1fr));
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.ch-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  color: inherit;
+  transition: border-color .18s, transform .18s, background .18s;
+}
+.ch-card:hover {
+  opacity: 1;
+  border-color: var(--cyan);
+  background: var(--surface2);
+  transform: translateY(-2px);
+}
+
+.ch-card-top { display: flex; align-items: center; justify-content: space-between; }
+.ch-num {
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--cyan);
+  letter-spacing: .06em;
+}
+.ch-diff { font-size: .6rem; color: var(--subtle); letter-spacing: .12em; }
+.ch-title { font-size: .98rem; font-weight: 600; line-height: 1.35; color: var(--text); }
+.ch-hook { font-size: .82rem; color: var(--muted); line-height: 1.5; flex: 1; }
+.ch-link {
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  color: var(--subtle);
+  letter-spacing: .04em;
+  margin-top: 4px;
+  transition: color .18s;
+}
+.ch-card:hover .ch-link { color: var(--cyan); }
+
+/* ── Rubric: two-line category cell ───────────────────────────────────────── */
+.rubric-cat { display: flex; flex-direction: column; gap: 3px; }
+.rubric-cat-name { font-weight: 600; font-size: .9rem; color: var(--text); }
+.rubric-cat-q { font-size: .78rem; color: var(--muted); line-height: 1.45; }
+
+.rubric-footnote { margin-top: 20px; font-size: .82rem; }
+
+/* ── Judging notes ────────────────────────────────────────────────────────── */
+.judging-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+.jn-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--orange);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+}
+.jn-head {
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--orange);
+  margin-bottom: 5px;
+}
+.jn-body { font-size: .8rem; color: var(--muted); line-height: 1.5; }
+
+/* ── Results ──────────────────────────────────────────────────────────────── */
+/* Hidden until app.js has a populated RESULTS array. */
+#results { display: none; }
+#results.visible { display: block; }
+
+.results-board { display: flex; flex-direction: column; gap: 10px; }
+
+.res-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+  display: grid;
+  grid-template-columns: 44px 1fr 200px 64px;
+  gap: 18px;
+  align-items: center;
+}
+.res-winner {
+  border-color: var(--yellow);
+  background: linear-gradient(90deg, rgba(251,191,36,.07), var(--surface) 60%);
+}
+
+.res-rank { font-size: 1.4rem; text-align: center; }
+.res-name { font-weight: 600; font-size: .95rem; color: var(--text); }
+.res-ch {
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  color: var(--subtle);
+  letter-spacing: .04em;
+}
+
+.res-bar-track {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.res-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--cyan), var(--blue));
+}
+.res-winner .res-bar-fill { background: linear-gradient(90deg, var(--yellow), var(--orange)); }
+
+.res-score {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-align: right;
+  color: var(--text);
+}
+.res-winner .res-score { color: var(--yellow); }
+
 /* ── Responsive ────────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
   section { padding: 64px 0; }
@@ -832,4 +980,15 @@ footer {
   .example-body { padding: 20px; }
   .example-header { padding: 16px 20px; }
   .footer-inner { flex-direction: column; align-items: flex-start; }
+  .challenge-grid { grid-template-columns: 1fr; }
+  .subsection-title { margin-top: 44px; }
+  .res-row { grid-template-columns: 34px 1fr 58px; }
+  .res-bar-track { display: none; }
+}
+
+/* Respect reduced-motion: the scroll reveals in app.js set inline opacity, so
+   this only tames the CSS-side transitions and the smooth scroll. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
